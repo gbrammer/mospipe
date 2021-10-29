@@ -1,0 +1,2 @@
+# mospipe
+MOSFIRE analysis pipeline
