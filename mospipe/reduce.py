@@ -1286,7 +1286,8 @@ class MosfireMask(object):
             
         xok = np.isfinite(xsh)
         if len(xsh) > 1:
-            xok &= np.abs(np.gradient(xsh)) < 3 #np.abs(xsh) < dxmax
+            xok &= np.abs(np.gradient(xsh)) < 3
+            xok &= np.abs(xsh) < dxmax
         
         for it in range(3):
             xy_coeffs = np.polyfit(ysh[xok]-imed, xsh[xok], xy_order)
