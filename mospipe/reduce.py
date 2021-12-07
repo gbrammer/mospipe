@@ -1683,7 +1683,8 @@ class MosfireMask(object):
             sing = (outwht[0::2,:,:] > 0).sum(axis=0) > 0
             sing &= (outwht[1::2,:,:] > 0).sum(axis=0) > 0
             outwht *= sing
-            
+        
+        avg = 0    
         if sig_clip is not None:
             clip = np.isfinite(outwht) & (outwht > 0)
             c0 = clip.sum()
@@ -2708,11 +2709,15 @@ filt_params = {
 }
 
 
-def fit_vega_spectrum(hip_wave, hip_flux, hip_err, hip_mag=8.503, filter='K', df=11, fwhm=0.0025, dv=0, ax=None, make_figure=True):
+def fit_vega_spectrum(hip_wave, hip_flux, hip_err, hip_mag=8.503, filter='K', df=11, fwhm=0.0025, dv=0, ax=None, make_figure=True, mask=None):
     
     import astropy.units as u
     from synphot import SourceSpectrum, SpectralElement, units
+    from scipy.modeling import models
+    
     vega = SourceSpectrum.from_vega()
+    
+    flam = 1*u.erg/u.second/u.erg/u.cm**2/u.Angstrom
     
     hip_vega = vega(hip_wave*u.micron).to(flam, equivalencies=u.spectral_density(hip_wave*u.micron)) 
     
