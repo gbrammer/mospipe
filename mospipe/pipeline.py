@@ -32,7 +32,7 @@ def install_dfits():
         os.system('rm -rf eso_fits_tools')
 
 
-def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, **kwargs):
+def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, **kwargs):
     """
     Run the pipeline to download files and extract 2D spectra
     """
@@ -86,8 +86,11 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
         Koa.query_adql(query, hash_file, overwrite=True, format='csv', 
                        cookiepath=cookiepath)
-                       
+        
     mfx = utils.read_catalog(hash_file)
+    if query_only:
+        return mfx
+        
     print(f'{len(mfx)} exposures found in {hash_file}')
     
     if len(mfx) < min_nexp:
@@ -466,7 +469,7 @@ if __name__ == '__main__':
         if arg.startswith('--') & ('=' in arg):
             kw = arg.split('=')[0][2:]
             val = '='.join(arg.split('=')[1:])
-                        
+            
             if val.lower() == 'false':
                 val = False
             elif val.lower() == 'true':
@@ -486,4 +489,7 @@ if __name__ == '__main__':
         run_pipeline(**kws)
     else:
         print(f"Abort: kwargs must include 'extra_query' or 'csv_file'")
-
+    
+    point_query = """
+    where (contains(point('J2000',ra ,dec), circle('J2000', 215.050566 53.007441, 0.2))=1)
+     """
