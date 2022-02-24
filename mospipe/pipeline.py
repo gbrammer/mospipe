@@ -465,5 +465,5 @@ if __name__ == '__main__':
     if ('extra_query' in kws) | ('csv_file' in kws):
         run_pipeline(**kws)
     else:
-        print("args {kws} must include 'extra_query' or 'csv_file'")
+        print(f"Abort: kwargs must include 'extra_query' or 'csv_file'")
 
