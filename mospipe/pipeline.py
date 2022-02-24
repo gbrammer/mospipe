@@ -350,18 +350,38 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     
     print(f'{mask}_slit_objects > `mosfire_extractions`')
     
-    # Exposures
+    # Exposures / Masks
     exp = utils.read_catalog(f'{mask}_exposures.csv')
-    df = exp.to_pandas()
     
+    mask_cols = ['instrument', 'targname', 'koaimtyp', 'pattern', 'date_obs', 
+                 'mgtname', 'maskname', 'semid', 'proginst', 'progid',
+                 'progpi', 'progtitl', 'datemask']
+    
+    exp_cols = ['datemask', 'koaid', 'ofname', 'frame', 'frameid', 'frameno', 
+                'ra', 'dec', 'ut', 'filehand', 'airmass', 'guidfwhm',
+                'mjd_obs', 'elaptime', 'filter', 'waveblue', 'wavered',
+                'gratmode', 'pscale', 'sampmode', 'numreads', 'coadds',
+                'truitime']
+    
+    df_mask = exp[mask_cols][0:1].to_pandas()
+    df_exp = exp[exp_cols].to_pandas()
+    
+    # Mask
+    db.execute_helper('DELETE FROM mosfire_datemask WHERE '
+                       f"datemask='{mask}'", engine)
+    
+    df_mask.to_sql('mosfire_datemask', engine, index=False, 
+              if_exists='append', method='multi')
+    
+    # Exposures        
     db.execute_helper('DELETE FROM mosfire_exposures WHERE '
                        f"datemask='{mask}'", engine)
 
-    df.to_sql('mosfire_exposures', engine, index=False, 
+    df_exp.to_sql('mosfire_exposures', engine, index=False, 
               if_exists='append', method='multi')
     
-    print(f'{mask}_exposures > `mosfire_exposures`')
-    
+    print(f'{mask}_exposures > `mosfire_exposures`, `mosfire_datemask`')
+
     #os.chdir(mask)
     os.system(f'aws s3 rm s3://{bucket}/{prefix}/{mask}/ --recursive')
     os.system(f'cd {owd}/{mask}; '+ 
