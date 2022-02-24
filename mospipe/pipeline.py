@@ -311,7 +311,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         flat_files = glob.glob(f'{mask}/*/*/*/*/*combflat*fits')
         for flat_file in flat_files:
             os.chdir(pwd)
-            mospipe.reduce.run_mask(flat_file, skip=False, 
+            msk = mospipe.reduce.run_mask(flat_file, skip=False, 
                                     initial_thresh=None, max_iter=50, 
                                     use_ssl_slits=False)
             plt.close('all')

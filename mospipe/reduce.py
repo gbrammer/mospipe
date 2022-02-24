@@ -2842,7 +2842,7 @@ def run_mask(flat, skip=True, **kwargs):
     
     plt.close('all')
     
-    return True
+    return mask
     
     
 def dump_all():
