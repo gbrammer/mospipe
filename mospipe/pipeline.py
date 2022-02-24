@@ -465,7 +465,7 @@ if __name__ == '__main__':
     for arg in sys.argv:
         if arg.startswith('--') & ('=' in arg):
             kw = arg.split('=')[0][2:]
-            val = arg.split('=')[1]
+            val = '='.join(arg.split('=')[1:])
                         
             if val.lower() == 'false':
                 val = False
