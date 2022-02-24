@@ -757,7 +757,7 @@ class MosfireMask(object):
                 row += ','.join([f'{v:.6f}' for v in rot2.flatten()]) + ')'
                 sw = float(self.ssl['Slit_width'][i])/2
                 reg_label = ' # text=<<<{0} {1}>>>\n'
-                row += reg_label.format(self.ssl['Slit_number'][i].strip(), 
+                row += reg_label.format(self.ssl['Slit_Number'][i].strip(), 
                                         self.ssl['Target_Name'][i].strip())
                 row = row.replace('<<<','{').replace('>>>','}')
                 fp.write(row)
