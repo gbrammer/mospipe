@@ -32,7 +32,7 @@ def install_dfits():
         os.system('rm -rf eso_fits_tools')
 
 
-def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True):
+def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, **kwargs):
     """
     Run the pipeline to download files and extract 2D spectra
     """
@@ -462,7 +462,7 @@ if __name__ == '__main__':
             
     print(f'Run pipeline with kwargs: {kws}')
     
-    if ('extra_query' in kws) | ('csv_file') in kws:
+    if ('extra_query' in kws) | ('csv_file' in kws):
         run_pipeline(**kws)
     else:
         print("args {kws} must include 'extra_query' or 'csv_file'")
