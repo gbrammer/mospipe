@@ -46,6 +46,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     install_dfits()
     
+    if csv_file.startswith('s3://'):
+        os.system(f'aws s3 cp {csv_file} . ')
+        csv_file = os.path.basename(csv_file)
+        
     if 'KOA_USERNAME' in os.environ:
         from pykoa.koa import Koa
         cookiepath = 'koa.kookie'
@@ -434,5 +438,32 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     
     return tab
     
-        
     
+if __name__ == '__main__':
+    argv = sys.argv
+    kws = {}
+    for arg in sys.argv:
+        if arg.startswith('--') & ('=' in arg):
+            kw = arg.split('=')[0][2:]
+            val = arg.split('=')[1]
+            
+            try:
+                val = int(val)
+            except ValueError:
+                pass
+            
+            if val.lower() == 'false':
+                val = False
+            
+            if val.lower() == 'true':
+                val = True
+            
+            kws[kw] = val
+            
+    print(f'Run pipeline with kwargs: {kws}')
+    
+    if ('extra_query' in kws) | ('csv_file') in kws:
+        run_pipeline(**kws)
+    else:
+        print("args {kws} must include 'extra_query' or 'csv_file'")
+
