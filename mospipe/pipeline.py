@@ -446,18 +446,18 @@ if __name__ == '__main__':
         if arg.startswith('--') & ('=' in arg):
             kw = arg.split('=')[0][2:]
             val = arg.split('=')[1]
-            
-            try:
-                val = int(val)
-            except ValueError:
-                pass
-            
+                        
             if val.lower() == 'false':
                 val = False
-            
-            if val.lower() == 'true':
+            elif val.lower() == 'true':
                 val = True
-            
+
+            if isinstance(val, str):
+                try:
+                    val = int(val)
+                except ValueError:
+                    pass
+        
             kws[kw] = val
             
     print(f'Run pipeline with kwargs: {kws}')
