@@ -413,7 +413,7 @@ def slit_summary(mask, outfile='slit_objects.csv'):
         return None
         
     rows = []
-    keys = ['SLITNUM','DATEMASK','TARGNAME','FILTER', 
+    keys = ['SLITNUM', 'DATEMASK','TARGNAME','FILTER', 
             'NEXP', 'EXPTIME',
             'RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG','SKYPA3',
             'TARGOFF', 'TARGYPIX', 
@@ -448,6 +448,7 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     tab['skypa3'].format = '6.1f'
 
     tab['slitnum'].format = '2d'
+    #tab['slitidx'].format = '2d'
 
     for k in ['datemask','targname']:
         tab[k].format = '24'

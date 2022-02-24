@@ -1310,7 +1310,10 @@ class MosfireMask(object):
             xok = np.isfinite(xsh)
             if len(xsh) > 1:
                 xok &= (np.abs(np.gradient(xsh)) < 3) & (np.abs(xfit-xsh) < 3)
-            
+        
+        targname =  self.ssl['Target_Name'][slit].strip()
+        slit_num = int(self.ssl['Slit_Number'][slit])
+          
         slit_info = {}
         slit_info['slit'] = slit
         slit_info['i0'] = i0
@@ -1328,9 +1331,8 @@ class MosfireMask(object):
         slit_info['xsh'] = xsh
         slit_info['ysh'] = ysh
         slit_info['xok'] = xok
-        
-        targname =  self.ssl['Target_Name'][slit]
-        slit_info['target_name'] = targname.strip()
+                
+        slit_info['target_name'] = targname
         
         slit_info['width'] = float(self.ssl['Slit_width'][slit])
         slit_info['length'] = float(self.ssl['Slit_length'][slit])
@@ -1347,7 +1349,7 @@ class MosfireMask(object):
         slit_info['target_ra'] = self.ssl['target_ra'][slit]
         slit_info['target_dec'] = self.ssl['target_dec'][slit]
         slit_info['target_mag'] = self.ssl['Magnitude'][slit]
-        slit_info['target_orig_slit'] = int(self.ssl['Slit_Number'][slit])
+        slit_info['target_orig_slit'] = slit_num
         slit_info['datemask'] = self.datemask
         
         ############
@@ -1371,7 +1373,7 @@ class MosfireMask(object):
 
                 if ia == 0:
                     ax.text(0.02, 0.96, 
-                          f'{self.datemask} {self.filter} {slit}: {targname}', 
+                      f'{self.datemask} {self.filter} {slit_num}: {targname}', 
                             ha='left', va='top', transform=ax.transAxes, 
                             bbox=dict(facecolor='w', edgecolor='None'))
             
@@ -1425,7 +1427,7 @@ class MosfireMask(object):
         slit_info['lam_coeffs'] = lam_coeffs
         slit_info['wave'] = wave_fit
 
-        msg = ('Slit {0}: {1} {2}x{3} {4:.5f} {5:.5f}'.format(slit,
+        msg = ('Slit {0}: {1} {2}x{3} {4:.5f} {5:.5f}'.format(slit_num,
                     slit_info['target_name'], slit_info['width'],
                     slit_info['length'], slit_info['target_ra'],
                     slit_info['target_dec']))
@@ -1743,7 +1745,9 @@ class MosfireMask(object):
         h0['FILTER'] = self.filter, 'MOSFIRE filter'
         h0['DATEMASK'] = slit_info['datemask'], 'Unique mask identifier'
 
-        h0['SLITNUM'] = slit_info['slit'], 'Slit number, counting from y=0'
+        h0['SLITIDX'] = slit_info['slit'], 'Slit number, counting from y=0'
+        h0['SLITNUM'] = (slit_info['target_orig_slit'], 
+                          'Slit number in mask table')
         h0['Y0'] = slit_info['i0'], 'Bottom of the slit cutout'
         h0['Y1'] = slit_info['i1'], 'Top of the slit cutout'
         h0['YSTART'] = slit_info['istart'], 'Bottom of the slit'
@@ -2028,7 +2032,8 @@ class MosfireMask(object):
         for ax in axes:
             ax.grid()
         
-        txt = '{0} slit#{1} {2}'.format(self.namestr, slit_info['slit'],
+        txt = '{0} slit#{1} {2}'.format(self.namestr, 
+                                        slit_info['target_orig_slit'],
                                         slit_info['target_name'])
                                         
         axes[0].text(0.05, 0.95, txt, ha='left', va='top', 
@@ -2965,9 +2970,9 @@ def dumpheaders(flatfile):
     #     r[ik] = r[ik].replace(',','')
         
     tab = utils.GTable(rows=rows, names=keys)
-    cols = ['file', 'naxis1', 'naxis2', 'crpix1', 'crpix2', 'crval1', 'crval2', 'cd1_1', 'cd2_2', 'ctype1', 'ctype2', 'sigclipn', 'sigclipv', 'exptime', 'nexp', 'kernel', 'pixfrac', 'offseta', 'offsetb', 'targname', 'ra_slit', 'dec_slit', 'ra_targ', 'dec_targ', 'mag_targ', 'filter', 'datemask', 'slitnum', 'y0', 'y1', 'ystart', 'ystop', 'ypad', 'maskoff', 'targoff', 'targypix', 'lamorder', 'lamcoef0', 'lamcoef1', 'object', 'maskname', 'observer', 'pattern', 'dthcoord', 'skypa3', 'progid', 'progpi', 'progtl1', 'semester', 'wavered', 'waveblue', 'airmass_min', 'airmass_med', 'airmass_max', 'guidfwhm_min', 'guidfwhm_med', 'guidfwhm_max', 'mjd_obs_min', 'mjd_obs_med', 'mjd_obs_max']
+    cols = ['file', 'naxis1', 'naxis2', 'crpix1', 'crpix2', 'crval1', 'crval2', 'cd1_1', 'cd2_2', 'ctype1', 'ctype2', 'sigclipn', 'sigclipv', 'exptime', 'nexp', 'kernel', 'pixfrac', 'offseta', 'offsetb', 'targname', 'ra_slit', 'dec_slit', 'ra_targ', 'dec_targ', 'mag_targ', 'filter', 'datemask', 'slitidx', 'slitnum', 'y0', 'y1', 'ystart', 'ystop', 'ypad', 'maskoff', 'targoff', 'targypix', 'lamorder', 'lamcoef0', 'lamcoef1', 'object', 'maskname', 'observer', 'pattern', 'dthcoord', 'skypa3', 'progid', 'progpi', 'progtl1', 'semester', 'wavered', 'waveblue', 'airmass_min', 'airmass_med', 'airmass_max', 'guidfwhm_min', 'guidfwhm_med', 'guidfwhm_max', 'mjd_obs_min', 'mjd_obs_med', 'mjd_obs_max']
     
-    cols = ['file', 'naxis1', 'naxis2', 'crpix1', 'crpix2', 'crval1', 'crval2', 'cd1_1', 'cd2_2', 'sigclipn', 'sigclipv', 'exptime', 'nexp', 'kernel', 'pixfrac', 'plan', 'offseta', 'offsetb', 'targname', 'ra_slit', 'dec_slit', 'ra_targ', 'dec_targ', 'mag_targ', 'filter', 'datemask', 'slitnum', 'y0', 'y1', 'ystart', 'ystop', 'ypad', 'cunit2', 'ctype1', 'cunit1', 'maskoff', 'targoff', 'targypix', 'traorder', 'tracoef0', 'tracoef1', 'tracoef2', 'lamorder', 'lamcoef0', 'lamcoef1', 'object', 'framdesc', 'maskname', 'observer', 'pattern', 'dthcoord', 'skypa3', 'progid', 'progpi', 'progtl1', 'semester', 'wavered','waveblue', 'airmass_min', 'airmass_med', 'airmass_max', 'guidfwhm_min', 'guidfwhm_med', 'guidfwhm_max', 'mjd_obs_min', 'mjd_obs_max', 'mjd_obs']
+    cols = ['file', 'naxis1', 'naxis2', 'crpix1', 'crpix2', 'crval1', 'crval2', 'cd1_1', 'cd2_2', 'sigclipn', 'sigclipv', 'exptime', 'nexp', 'kernel', 'pixfrac', 'plan', 'offseta', 'offsetb', 'targname', 'ra_slit', 'dec_slit', 'ra_targ', 'dec_targ', 'mag_targ', 'filter', 'datemask', 'slitidx', 'slitnum', 'y0', 'y1', 'ystart', 'ystop', 'ypad', 'cunit2', 'ctype1', 'cunit1', 'maskoff', 'targoff', 'targypix', 'traorder', 'tracoef0', 'tracoef1', 'tracoef2', 'lamorder', 'lamcoef0', 'lamcoef1', 'object', 'framdesc', 'maskname', 'observer', 'pattern', 'dthcoord', 'skypa3', 'progid', 'progpi', 'progtl1', 'semester', 'wavered','waveblue', 'airmass_min', 'airmass_med', 'airmass_max', 'guidfwhm_min', 'guidfwhm_med', 'guidfwhm_max', 'mjd_obs_min', 'mjd_obs_max', 'mjd_obs']
     
     tab['file'] = files
     
