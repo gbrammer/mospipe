@@ -32,7 +32,7 @@ def install_dfits():
         os.system('rm -rf eso_fits_tools')
 
 
-def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10):
+def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True):
     """
     Run the pipeline to download files and extract 2D spectra
     """
@@ -302,10 +302,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 os.system(f'{sys.executable} RunFlat.py > mospy.log')
 
             os.chdir(redpath)
-        
-        if 'lont2pos' in mask:
-            continue
-            
+                    
         # Extractions
         os.chdir(pwd)
         flat_files = glob.glob(f'{mask}/*/*/*/*/*combflat_2d*fits')
@@ -317,16 +314,72 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             
             plt.close('all')
             
-            slit_summary(mask, outfile='_slit_objects.csv')
-            
+        slit_summary(mask, outfile='_slit_objects.csv')
+        
+        if sync:
+            sync_results(mask)
 
-def slit_summary(mask, outfile='_slit_objects.csv'):
+
+def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
+    """
+    Send files to S3 and update database
+    """
+    import pandas as pd
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    owd = os.getcwd()
+    
+    obj_file = f'{mask}_slit_objects.csv'
+    
+    if not os.path.exists(obj_file):
+        return False
+    
+    obj = utils.read_catalog(obj_file)
+    df = obj.to_pandas()
+    
+    db.execute_helper('DELETE FROM mosfire_extractions WHERE '
+                       f"datemask='{mask}'", engine)
+
+    df.to_sql('mosfire_extractions', engine, index=False, 
+              if_exists='append', method='multi')
+    
+    print(f'{mask}_slit_objects > `mosfire_extractions`')
+    
+    # Exposures
+    exp = utils.read_catalog(f'{mask}_exposures.csv')
+    df = exp.to_pandas()
+    
+    db.execute_helper('DELETE FROM mosfire_exposures WHERE '
+                       f"datemask='{mask}'", engine)
+
+    df.to_sql('mosfire_exposures', engine, index=False, 
+              if_exists='append', method='multi')
+    
+    print(f'{mask}_exposures > `mosfire_exposures`')
+    
+    #os.chdir(mask)
+    os.system(f'aws s3 rm s3://{bucket}/{prefix}/{mask}/ --recursive')
+    os.system(f'cd {owd}/{mask}; '+ 
+              f'aws s3 sync ./ s3://{bucket}/{prefix}/{mask}/ ' + 
+              '--exclude "*" --include "Reduced/*/*/[YJHK]/*"')
+    
+    files = glob.glob(f'{mask}*.*g')
+    files.sort()
+    for file in files:
+        os.system(f'aws s3 cp {file} s3://{bucket}/Log/')
+            
+    os.chdir(owd)
+    return True
+
+
+def slit_summary(mask, outfile='slit_objects.csv'):
     """
     Summary of *extracted* slit spectra
     """
     import astropy.io.fits as pyfits
     
-    files = glob.glob(f'{mask}/*/*/*/*/*sp.fits')
+    files = glob.glob(f'{mask}/*/*/*/*/*-slit_*sp.fits')
     files.sort()
     
     if len(files) == 0:
@@ -334,14 +387,21 @@ def slit_summary(mask, outfile='_slit_objects.csv'):
         
     rows = []
     keys = ['SLITNUM','DATEMASK','TARGNAME','FILTER', 
-            'EXPTIME','RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG','SKYPA3']
-
-    colnames = [k.lower() for k in keys]
+            'NEXP', 'EXPTIME',
+            'RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG','SKYPA3',
+            'TARGOFF', 'TARGYPIX', 
+            'TRAORDER', 'TRACOEF0', 'TRACOEF1', 'TRACOEF2', 
+            'LAMORDER', 'LAMCOEF0', 'LAMCOEF1', 
+            'Y0', 'Y1', 'YSTART', 'YSTOP', 'YPAD', 
+            'MJD-OBS']
+    
+    colnames = ['file']
+    colnames += [k.lower() for k in keys]
     colnames += ['slit_width', 'slit_length']
 
     for file in files:
         sp = pyfits.open(file)
-        row = []
+        row = [file]
         for k in keys:
             row.append(sp[0].header[k])
 
