@@ -61,12 +61,15 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     if not os.path.exists(hash_file):
         cols = ['koaid', 'ofname', 'instrume as instrument', 'targname',
-                'koaimtyp', 'frameno', 'ra', 'dec', 
+                'koaimtyp', 'frame', 'frameid', 'frameno', 'pattern', 
+                'ra', 'dec', 
                 "to_char(date_obs,'YYYY-MM-DD') as date_obs", 'ut', 
                 'elaptime', 'waveblue', 'wavered', 'gratmode', 'pscale',
                 'filter', 'mgtname', 'maskname', 'sampmode', 'numreads',
                 'coadds', 'truitime', 'semid', 'proginst', 'progid', 'progpi',
-                'progtitl, filehand']
+                'progtitl', 'filehand', 'airmass', 'guidfwhm', 'mjd_obs', 
+                "CONCAT(CONCAT(TRIM(maskname), '_'), " + 
+                        "SUBSTR(koaid, 4, 8)) as datemask"]
     
         query =  f"""select {', '.join(cols)}
                     from koa_mosfire
@@ -83,12 +86,15 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     mfx = utils.read_catalog(hash_file)
     print(f'{len(mfx)} exposures found in {hash_file}')
     
-    mfx['datemask'] = [f"{mask}_{file.split('.')[1]}"
-                       for mask, file in zip(mfx['maskname'], mfx['koaid'])]
-    if 'fileurl' not in mfx.colnames:
-        mfx['fileurl'] = [f'filehand={f}' for f in mfx['filehand']]
+    if len(mfx) < min_nexp:
+        return False
         
-    mfx.write(hash_file, overwrite=True)
+    # mfx['datemask'] = [f"{mask}_{file.split('.')[1]}"
+    #                    for mask, file in zip(mfx['maskname'], mfx['koaid'])]
+    # if 'fileurl' not in mfx.colnames:
+    #     mfx['fileurl'] = [f'filehand={f}' for f in mfx['filehand']]
+    #     
+    # mfx.write(hash_file, overwrite=True)
     
     ####### Run flats
     ONLY_FLAT = True
@@ -130,7 +136,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             continue
 
         tmp['instrume'] = tmp['instrument']
-        tmp['filehand'] = [f.split('filehand=')[1] for f in tmp['fileurl']]
+        #tmp['filehand'] = [f.split('filehand=')[1] for f in tmp['fileurl']]
 
         mask_table = os.path.join(outdir, f'{mask}.tbl')
         tmp['koaid','instrume','filehand'].write(mask_table, 
