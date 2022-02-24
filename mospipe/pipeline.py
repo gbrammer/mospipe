@@ -318,7 +318,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             
             plt.close('all')
             
-        slit_summary(mask, outfile='_slit_objects.csv')
+        slit_summary(mask, outfile='slit_objects.csv')
         
         if sync:
             sync_results(mask)
