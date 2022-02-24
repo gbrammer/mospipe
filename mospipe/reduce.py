@@ -158,7 +158,8 @@ def fit_wavelength_from_sky(sky_row, band, order=3, make_figure=True, nsplit=5, 
     # https://ui.adsabs.harvard.edu/abs/2015A%26A...581A..47O
     if use_oliva:
         data_dir = os.path.dirname(__file__)
-        oh = utils.read_catalog('data/oliva_oh_lines.vot')
+        oh_file = os.path.join(data_dir, 'data', 'oliva_oh_lines.vot')
+        oh = utils.read_catalog(oh_file)
         for b in lines:
             lines[b] = (oh['lambda1'] + oh['lambda2'])/2
             line_intens[b] = oh['Flux']/1000.
