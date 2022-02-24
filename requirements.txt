@@ -3,3 +3,6 @@ matplotlib >= 2.0.2
 scipy
 astropy >= 2.0.0
 mpdaf >= 1.0
+ccdproc
+git+https://github.com/gbrammer/PyKOA.git
+git+https://github.com/gbrammer/MosfireDRP.git
