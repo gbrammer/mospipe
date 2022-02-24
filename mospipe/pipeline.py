@@ -129,7 +129,8 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         sel = (mfx['datemask'] == mask)
         tmp = mfx[sel]
         print(f'{mask}  N={len(tmp)}')
-
+        tmp.write(os.path.join(pwd, f'{mask}_exposures.csv'), overwrite=True)
+        
         if sel.sum() < min_nexp:
             pop.append(mi)
             print(f'{mask}: too few exposures found ({sel.sum()} < {min_nexp}), skipping')
