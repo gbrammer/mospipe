@@ -651,19 +651,30 @@ class MosfireMask(object):
         ssl_stop = np.cumsum(sl/0.1799+5.35)-9
         return np.minimum(ssl_stop, 2045)
     
+
     @property
     def ssl_start(self):
         sl = np.cast[float](self.ssl['Slit_length'])
         return np.maximum(self.ssl_stop - sl/0.1799, 4)
         
+
     @property 
     def target_names(self):
         target_names = [t.strip() for t in self.ssl['Target_Name']]
         return target_names
 
+
+    @property 
+    def target_slit_numbers(self):
+        slit_numbers = [int(n.strip()) for n in self.ssl['Slit_Number']]
+        return slit_numbers
+
+
     @property 
     def target_keys(self):
-        target_keys = [f'{self.datemask}-{self.filter}-{t}' for t in self.target_names]
+        target_keys = [f'{self.datemask}-{self.filter}-slit_{n:02d}-{t}'
+                       for n, t in zip(self.target_slit_numbers, 
+                                       self.target_names)]
         return target_keys
 
 

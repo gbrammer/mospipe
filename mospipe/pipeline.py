@@ -308,10 +308,71 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             
         # Extractions
         os.chdir(pwd)
-        flat_files = glob.glob(f'{mask}/*/*/*/*/*combflat*fits')
+        flat_files = glob.glob(f'{mask}/*/*/*/*/*combflat_2d*fits')
         for flat_file in flat_files:
             os.chdir(pwd)
-            msk = mospipe.reduce.run_mask(flat_file, skip=False, 
+            msk = mospipe.reduce.run_mask(flat_file, skip=skip, 
                                     initial_thresh=None, max_iter=50, 
                                     use_ssl_slits=False)
+            
             plt.close('all')
+            
+            slit_summary(mask, outfile='_slit_objects.csv')
+            
+
+def slit_summary(mask, outfile='_slit_objects.csv'):
+    """
+    Summary of *extracted* slit spectra
+    """
+    import astropy.io.fits as pyfits
+    
+    files = glob.glob(f'{mask}/*/*/*/*/*sp.fits')
+    files.sort()
+    
+    if len(files) == 0:
+        return None
+        
+    rows = []
+    keys = ['SLITNUM','DATEMASK','TARGNAME','FILTER', 
+            'EXPTIME','RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG','SKYPA3']
+
+    colnames = [k.lower() for k in keys]
+    colnames += ['slit_width', 'slit_length']
+
+    for file in files:
+        sp = pyfits.open(file)
+        row = []
+        for k in keys:
+            row.append(sp[0].header[k])
+
+        slit_length = (sp[0].header['YSTOP'] - sp[0].header['YSTART'])*0.1799
+
+        row.extend([0.7, slit_length])
+
+        rows.append(row)
+
+    tab = utils.GTable(rows=rows, names=colnames)
+    for k in ['RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG']:
+        tab[k.lower()].format = '.6f'
+
+    for k in ['EXPTIME','slit_width','slit_length']:
+        tab[k.lower()].format = '.1f'
+
+    tab['skypa3'].format = '6.1f'
+
+    tab['slitnum'].format = '2d'
+
+    for k in ['datemask','targname']:
+        tab[k].format = '24'
+    
+    so = np.argsort(tab['slitnum'])
+    tab = tab[so]
+    
+    if outfile:
+        tab.write(f'{mask}_{outfile}', overwrite=True)
+        print(f'Slit summary to {mask}_{outfile}')
+    
+    return tab
+    
+        
+    
