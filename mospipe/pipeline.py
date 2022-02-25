@@ -666,6 +666,9 @@ def run_one(clean=True, **kwargs):
         
         update_mask_db_status(datemask, 1, verbose=True)
         
+        with open('/GrizliImaging/mosfire_processed.txt','a') as fp:
+            fp.write(f'{datemask} {time.ctime()}\n')
+            
         run_pipeline(**kws)
         
         if clean & (len(datemask) > 0):
