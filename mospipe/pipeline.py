@@ -327,11 +327,36 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             sync_results(mask)
 
 
+def update_mask_db_status(datemask, status, verbose=True):
+    """
+    Set status flag of a mask in the `mosfire_datemask` table
+    """
+    import pandas as pd
+    from astropy.time import Time
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    NOW = Time.now().mjd
+    
+    table = 'mosfire_datemask'
+    
+    sqlstr = f"""UPDATE {table}
+        SET status = {status}, mtime = '{NOW}'
+        WHERE (datemask = '{datemask}');"""
+
+    if verbose:
+        msg = f'Update status = {status} for {datemask} on `{table}` ({NOW})'
+        print(msg)
+
+    db.execute_helper(sqlstr, engine)
+
+
 def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     """
     Send files to S3 and update database
     """
     import pandas as pd
+    from astropy.time import Time
     from grizli.aws import db
     engine = db.get_db_engine()
     
@@ -355,10 +380,12 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     
     # Exposures / Masks
     exp = utils.read_catalog(f'{mask}_exposures.csv')
+    exp['status'] = 2
+    exp['mtime'] = Time.now().mjd
     
     mask_cols = ['instrument', 'targname', 'koaimtyp', 'pattern', 'date_obs', 
                  'mgtname', 'maskname', 'semid', 'proginst', 'progid',
-                 'progpi', 'progtitl', 'datemask']
+                 'progpi', 'progtitl', 'datemask','status','mtime']
     
     exp_cols = ['datemask', 'koaid', 'ofname', 'frame', 'frameid', 'frameno', 
                 'ra', 'dec', 'ut', 'filehand', 'airmass', 'guidfwhm',
@@ -405,6 +432,7 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     Summary of *extracted* slit spectra
     """
     import astropy.io.fits as pyfits
+    from astropy.time import Time
     
     files = glob.glob(f'{mask}/*/*/*/*/*-slit_*sp.fits')
     files.sort()
@@ -422,13 +450,14 @@ def slit_summary(mask, outfile='slit_objects.csv'):
             'Y0', 'Y1', 'YSTART', 'YSTOP', 'YPAD', 
             'MJD-OBS']
     
-    colnames = ['file']
+    colnames = ['file', 'modtime']
     colnames += [k.lower() for k in keys]
     colnames += ['slit_width', 'slit_length']
 
     for file in files:
         sp = pyfits.open(file)
-        row = [file]
+        mtime = modtime = Time(os.path.getmtime(file), format='unix').mjd
+        row = [file, mtime]
         for k in keys:
             row.append(sp[0].header[k])
 
@@ -448,6 +477,7 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     tab['skypa3'].format = '6.1f'
 
     tab['slitnum'].format = '2d'
+    tab['modtime'].format = '.3f'
     #tab['slitidx'].format = '2d'
 
     for k in ['datemask','targname']:
@@ -463,6 +493,59 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     return tab
     
     
+def get_random_mask(extra=''):
+    """
+    Find a mask that needs processing
+    """
+    from grizli.aws import db
+    engine = db.get_db_engine()
+        
+    all_masks = db.from_sql('SELECT DISTINCT(datemask) FROM mosfire_datemask' 
+                             ' WHERE status=0 ' + extra, engine)
+    
+    if len(all_masks) == 0:
+        return None
+    
+    random_mask = all_masks[np.random.randint(0, len(all_masks))][0]
+    return random_mask
+
+
+def run_all(**kwargs):
+    """
+    Process all mask with status=0
+    """
+    import os
+    import time
+    from grizli.aws import db
+
+    engine = db.get_db_engine()
+
+    nmask = db.from_sql('select count(distinct(datemask)) '
+                         ' from mosfire_datemask WHERE status = 0', 
+                         engine)['count'][0]
+
+    assoc = -1
+    j = 0
+    while (assoc is not None) & (j < nmask):
+        j += 1
+        datemask = get_random_mask()
+        if assoc is not None:
+            print(f'==============  Run datemask  ===============')
+            print(f'{j}: {datemask}')
+            print(f'========= {time.ctime()} ==========')
+            
+            maskname = '_'.join(datemask.split('_')[:-1])
+            koaid = 'MF.{0}'.format(datemask.split('_')[-1])
+            query = f"AND koaid LIKE '{koaid}%%' AND maskname='{maskname}'"
+            kws = dict(extra_query=query, 
+                       csv_file=f'mosfire.{datemask}.csv', 
+                       **kwargs)
+            
+            update_mask_db_status(datemask, 1, verbose=True)
+            
+            run_pipeline(kws)
+
+
 if __name__ == '__main__':
     argv = sys.argv
     kws = {}
