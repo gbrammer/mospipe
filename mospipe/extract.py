@@ -668,8 +668,10 @@ def find_gaussian_lines(sp, binw=50, linew=120, zi=None, left_pad=10, peak_thres
     #binw = 50 # km/s
     #logw = utils.log_zgrid([sp['wave'][0], sp['wave'][-1]], binw/3.e5)
     logw = utils.log_zgrid([3000, 2.5e4], binw/3.e5)
+    #logw = (logw[:-1]+np.diff(logw)/2.).astype(np.float32)
     clip = (logw > sp['wave'][0]) & (logw < sp['wave'][-1])
     logw = logw[clip]
+    logwave = (logw[:-1]+np.diff(logw)/2.).astype(np.float32)
     
     band = sp['filter']
     
@@ -720,7 +722,7 @@ def find_gaussian_lines(sp, binw=50, linew=120, zi=None, left_pad=10, peak_thres
     #print('xx', logw.shape, lw.shape)
     
     log_spec = utils.GTable()
-    log_spec['wave'] = (logw[:-1]+np.diff(logw)/2.).astype(np.float32)
+    log_spec['wave'] = logwave
     log_spec['awave'] = lw.astype(np.float32)
     log_spec['flux'] = lf.astype(np.float32)
     log_spec['err'] = le.astype(np.float32)

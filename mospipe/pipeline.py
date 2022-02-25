@@ -405,7 +405,36 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
               if_exists='append', method='multi')
     
     print(f'{datemask}_slit_objects > `mosfire_extractions`')
-
+    
+    # 1D spectra
+    files = glob.glob(f'{datemask}/*/*/*/*/*log1d.fits')
+    files.sort()
+    
+    filters = np.unique([f.split('/')[-2].lower() for f in files])
+    for f in filters:
+        db.execute_helper(f'DELETE FROM mosfire_spectra_{f} WHERE '
+                       f"datemask='{datemask}'", engine)
+    
+    for file in files:
+        spec = utils.read_catalog(file)
+        
+        df = pd.DataFrame()
+        df['datemask'] = [spec.meta['DATEMASK']]
+        df['filter'] = [spec.meta['FILTER']]
+        df['slitnum'] = [spec.meta['SLITNUM']]
+        df['flux'] = [spec["flux"].astype(np.float32).tolist()]
+        df['err'] = [spec["err"].astype(np.float32).tolist()]
+        df['lineflux'] = [spec["line_flux"].astype(np.float32).tolist()]
+        df['lineerr'] = [spec["line_err"].astype(np.float32).tolist()]
+        
+        oned_table = f"mosfire_spectra_{spec.meta['FILTER']}".lower()
+        msg = f'{os.path.basename(file)} > `{oned_table}`'
+        print(msg)
+        
+        df.to_sql(oned_table, 
+                  engine, index=False, 
+                  if_exists='append', method='multi')
+    
     if delete_from_s3:
         os.system(f'aws s3 rm s3://{bucket}/{prefix}/{datemask}/ --recursive')
         
@@ -588,7 +617,47 @@ def setup_db_tables():
     REFERENCES mosfire_datemask (datemask);
     """
     engine.execute(SQL)
-
+    
+    SQL = """
+    ALTER TABLE mosfire_extractions ADD PRIMARY KEY (datemask, filter, slitnum);"""
+    engine.execute(SQL)
+    
+    for filt, n in zip('yjhk', [996, 1009, 1305, 1469]):
+        
+        SQL = f"""
+    CREATE TABLE IF NOT EXISTS mosfire_spectra_{filt} (
+        datemask VARCHAR, 
+        filter VARCHAR, 
+        slitnum INT, 
+        flux REAL[{n}], 
+        err REAL[{n}], 
+        lineflux REAL[{n}], 
+        lineerr REAL[{n}], 
+        FOREIGN KEY (datemask, filter, slitnum)
+            REFERENCES mosfire_extractions (datemask, filter, slitnum)
+        );
+        """
+    
+        engine.execute(SQL)
+    
+    SQL = """
+    CREATE TABLE IF NOT EXISTS mosfire_spectra_k (
+        datemask VARCHAR, 
+        filter VARCHAR, 
+        slitnum INT, 
+        flux REAL[1469], 
+        err REAL[1469], 
+        lineflux REAL[1469], 
+        lineerr REAL[1469], 
+        FOREIGN KEY (datemask, filter, slitnum)
+            REFERENCES mosfire_extractions (datemask, filter, slitnum)
+        );
+        """
+    
+    engine.execute(SQL)
+    
+    engine.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
+    
     # Test
     
 
@@ -672,7 +741,7 @@ def run_one(clean=True, **kwargs):
         run_pipeline(**kws)
         
         if clean & (len(datemask) > 0):
-            os.system('rm -rf {datemask}')
+            os.system(f'rm -rf {datemask}')
 
 
 if __name__ == '__main__':
