@@ -428,6 +428,7 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     """
     import astropy.io.fits as pyfits
     from astropy.time import Time
+    from . import extract
     
     files = glob.glob(f'{datemask}/*/*/*/*/*-slit_*sp.fits')
     files.sort()
@@ -435,7 +436,6 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     if len(files) == 0:
         return None
         
-    rows = []
     keys = ['SLITNUM', 'DATEMASK','TARGNAME','FILTER', 
             'NEXP', 'EXPTIME',
             'RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG','SKYPA3',
@@ -448,8 +448,35 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     colnames = ['file', 'modtime']
     colnames += [k.lower() for k in keys]
     colnames += ['slit_width', 'slit_length']
-
+    
+    oned_cols = ['binw','linew','wmin','wmax','sn16','sn50','sn84',
+                 'sn99', 'prof_amp', 'prof_sig', 'prof_mu',
+                 'prof_yma', 'prof_ma', 'prof_ymi', 'prof_mi', 
+                 'prof_offset', 'pthresh', 'lthresh', 'nline']
+    
+    oned_ints = ['binw','linew','nline', 'prof_mi', 'prof_ma']
+    
+    for j in range(4):
+        oned_cols += [f'linew{j:02d}', f'linesn{j:02d}', f'linef{j:02d}', f'linee{j:02d}']
+    
+    if False:
+        ## Add columns to database
+        for k in oned_cols:
+            if k in oned_ints:
+                dtype = 'INT'
+            else:
+                dtype = 'REAL'
+             
+            cmd = f'ALTER TABLE mosfire_extractions ADD COLUMN {k} {dtype}'  
+            print(cmd)
+            engine.execute(cmd)
+                
+    colnames += oned_cols
+    
+    rows = []
+    
     for file in files:
+        
         sp = pyfits.open(file)
         modtime = modtime = Time(os.path.getmtime(file), format='unix').mjd
         row = [file, modtime]
@@ -459,8 +486,51 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
         slit_length = (sp[0].header['YSTOP'] - sp[0].header['YSTART'])*0.1799
 
         row.extend([0.7, slit_length])
-
-        rows.append(row)
+        
+        # Oned extraction
+        try:
+            #if 1:
+            spec = extract.runit(file)
+            meta = spec["log_spec"].meta
+            
+            oned_row = []
+            for k in oned_cols:
+                if k in meta:
+                    if hasattr(meta[k], '__len__'):
+                        val = meta[k][0]
+                    else:
+                        val = meta[k]
+                    
+                    if k in oned_ints:
+                        try:
+                            val = int(val)
+                        except ValueError:
+                            val = -999
+                else:
+                    if k in oned_ints:
+                        val = -999
+                    else:
+                        val = -999.
+                        
+                oned_row.append(val)
+            
+            msg = f'{datemask}: 1D extraction for {file}'
+            print(msg)
+            
+        except:
+            msg = f'{datemask}: 1D extraction *failed* for {file}'
+            print(msg)
+            
+            oned_row = []
+            for k in oned_cols:
+                if k in oned_ints:
+                    val = -9999
+                else:
+                    val = -9999.
+                        
+                oned_row.append(val)
+               
+        rows.append(row + oned_row)
 
     tab = utils.GTable(rows=rows, names=colnames)
     for k in ['RA_SLIT','DEC_SLIT','RA_TARG','DEC_TARG']:
@@ -474,7 +544,11 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     tab['slitnum'].format = '2d'
     tab['modtime'].format = '.3f'
     #tab['slitidx'].format = '2d'
-
+    
+    for k in oned_cols:
+        if k not in oned_ints:
+            tab[k].format = '.2f'
+            
     for k in ['datemask','targname']:
         tab[k].format = '24'
     

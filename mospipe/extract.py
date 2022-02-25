@@ -431,6 +431,9 @@ def optimal_extract(file, show_sn=False, slx=slice(300,-300), prof_model=models.
     tab.meta['sn84'] = snperc[2], 'SN 84th percentile'
     tab.meta['sn99'] = snperc[3], 'SN 99th percentile'
     
+    tab.meta['slitnum'] = im[0].header['SLITNUM'], 'Mask slit number'
+    tab.meta['slitidx'] = im[0].header['SLITIDX'], 'Mask slit index'
+    
     tab.meta['prof_amp'] = spec['prof_model'].amplitude.value, 'Profile model amplitude'
     tab.meta['prof_sig'] = spec['prof_model'].stddev.value, 'Profile model sigma'
     tab.meta['prof_mu'] = spec['prof_model'].mean.value, 'Profile model mean'
@@ -471,9 +474,10 @@ def optimal_extract(file, show_sn=False, slx=slice(300,-300), prof_model=models.
         tab.meta['{0}'.format(tr[k])] = np.nanmedian(stats[k]), f'Median {k}'
         tab.meta['{0}_max'.format(tr[k])] = np.nanmax(stats[k]), f'Max {k}'
     
-    full_path = os.path.join(os.getcwd(), file)
-    tab.meta['file'] = os.path.basename(full_path), 'Extraction filename'
-    tab.meta['path'] = os.path.dirname(full_path), 'File path'
+    # full_path = os.path.join(os.getcwd(), file)
+    # full_path = file
+    tab.meta['file'] = os.path.basename(file), 'Extraction filename'
+    tab.meta['path'] = os.path.dirname(file), 'File path'
     tab.meta['datemask'] = im[0].header['DATEMASK'], 'Unique mask identifier'
     
     spec['opt_spec'] = tab
