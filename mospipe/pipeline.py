@@ -168,6 +168,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         print(f'\n{mask}: Download\n')
         rawdir = os.path.join(pwd, mask, 'Raw')
         
+        # Try to sync from S3 staging
+        s3stage = f's3://mosfire-pipeline/RawFiles/{mask}/'
+        os.system(f'aws s3 sync {s3stage} {rawdir}/')
+        
         # Manual download files if missing
         fitsfiles = glob.glob(os.path.join(rawdir, '*fits'))
         wget = 'wget https://koa.ipac.caltech.edu/cgi-bin/getKOA/nph-getKOA?filehand={0} -O {1}'
@@ -192,6 +196,9 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         rawdir = os.path.join(pwd, mask, 'Raw')
         os.chdir(rawdir)
 
+        # sync to s3 staging
+        os.system(f'aws s3 sync {rawdir}/ {s3stage}')
+
         files = glob.glob('MF*fits')
         if len(files) == 0:
             print(f'No downloaded files found for mask {mask}')
@@ -208,7 +215,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 os.remove(file)
         else:
             print(f'{mask}: no aborted files')
-
+                
         ###### Run the whole thing
         redpath = os.path.join(pwd, mask, 'Reduced')
         rawpath = os.path.join(pwd, mask, 'Raw')
