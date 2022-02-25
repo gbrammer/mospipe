@@ -347,16 +347,8 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
         return False
     
     obj = utils.read_catalog(obj_file)
-    df = obj.to_pandas()
-    
-    db.execute_helper('DELETE FROM mosfire_extractions WHERE '
-                       f"datemask='{mask}'", engine)
-
-    df.to_sql('mosfire_extractions', engine, index=False, 
-              if_exists='append', method='multi')
-    
-    print(f'{mask}_slit_objects > `mosfire_extractions`')
-    
+    df_obj = obj.to_pandas()
+        
     # Exposures / Masks
     exp = utils.read_catalog(f'{mask}_exposures.csv')
     exp['status'] = 2
@@ -374,18 +366,26 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     
     df_mask = exp[mask_cols][0:1].to_pandas()
     df_exp = exp[exp_cols].to_pandas()
+
+    # Send to tables
     
-    # Mask
+    db.execute_helper('DELETE FROM mosfire_extractions WHERE '
+                       f"datemask='{mask}'", engine)
+
+    db.execute_helper('DELETE FROM mosfire_exposures WHERE '
+                       f"datemask='{mask}'", engine)
+    
     db.execute_helper('DELETE FROM mosfire_datemask WHERE '
                        f"datemask='{mask}'", engine)
+    
+    df_obj.to_sql('mosfire_extractions', engine, index=False, 
+              if_exists='append', method='multi')
+    
+    print(f'{mask}_slit_objects > `mosfire_extractions`')
     
     df_mask.to_sql('mosfire_datemask', engine, index=False, 
               if_exists='append', method='multi')
     
-    # Exposures        
-    db.execute_helper('DELETE FROM mosfire_exposures WHERE '
-                       f"datemask='{mask}'", engine)
-
     df_exp.to_sql('mosfire_exposures', engine, index=False, 
               if_exists='append', method='multi')
     
