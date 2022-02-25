@@ -545,11 +545,11 @@ def update_mask_db_status(datemask, status, verbose=True):
         db.execute_helper(sqlstr, engine)
         if verbose:
             msg = (f'Update status = {status} for {datemask} '
-                   f'on `{table}` ({NOW})'
+                   f'on `{table}` ({NOW})')
             print(msg)
     except:
         msg = (f'FAILED Update status = {status} for {datemask} '
-               f'on `{table}` ({NOW})'
+               f'on `{table}` ({NOW})')
         print(msg)
         
 
