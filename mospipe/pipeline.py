@@ -74,14 +74,14 @@ def master_query():
     egs = "(contains(point('J2000',ra ,dec), circle('J2000', 214.8288 52.8067, 1.8))=1)"
     gdn = "(contains(point('J2000',ra ,dec), circle('J2000', 189.236	62.257, 1.8))=1)"
     
-    query =  f"""select maskname, filter, SUBSTR(koaid, 4, 8) night, COUNT(maskname) count
+    query =  f"""select maskname, filter, progpi, SUBSTR(koaid, 4, 8) night, COUNT(maskname) count
                 from koa_mosfire
                 WHERE gratmode='spectroscopy' AND koaimtyp='object'
                 AND maskname NOT LIKE '%%(align)%%'
                 AND maskname NOT LIKE '%%long2pos%%'                
                 AND ({egs} OR {cos} OR {uds} OR {gds} OR {gdn})
                 AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
-                GROUP BY maskname, filter, SUBSTR(koaid, 4, 8)
+                GROUP BY maskname, filter, progpi, SUBSTR(koaid, 4, 8)
                 """
     
     print(f'======= Query ======= \n{query}\n ===============')
@@ -100,6 +100,8 @@ def master_query():
     for d in done['datemask']:
         skip |= res['datemask'] == d
     
+    skip |= res['count'] < 8
+    
     res['status'] = 0
     hyp = np.array(['Hyperi' in d for d in res['datemask']])
     new = np.array([d > 20220000 for d in res['night']])
@@ -112,7 +114,17 @@ def master_query():
     highz |= np.array(['red' in d.lower() for d in res['datemask']])
     highz |= np.array(['nug' in d.lower() for d in res['datemask']])
     
-    keep = (~skip) & (hyp | new | highz)
+    pi = np.array(['illing' in d.lower() for d in res['progpi']])
+    pi |= np.array(['ellis' in d.lower() for d in res['progpi']])
+    pi |= np.array(['ellis' in d.lower() for d in res['progpi']])
+    pi |= np.array(['finkels' in d.lower() for d in res['progpi']])
+    pi |= np.array(['oesc' in d.lower() for d in res['progpi']])
+    pi |= np.array(['ilson' in d.lower() for d in res['progpi']])
+    pi |= np.array(['tanaka' in d.lower() for d in res['progpi']])
+    pi |= np.array(['glazebrook' in d.lower() for d in res['progpi']])
+    pi |= np.array(['apovich' in d.lower() for d in res['progpi']])
+    
+    keep = (~skip) & (hyp | new | highz | pi)
     
     un = utils.Unique(res['datemask'][keep], verbose=False)
     df = pd.DataFrame()
@@ -121,6 +133,10 @@ def master_query():
         
     df.to_sql('mosfire_datemask', engine, index=False, 
               if_exists='append', method='multi')
+    
+    # Full extractions
+    run_one(datemask='cosmos_ID3_20220223', delete_from_s3=False, orig_slit_numbers=[17], save_full_drizzled=True, clean=False, skip=False)
+    
     
     
 def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, download_only=False, skip_long2pos=True, **kwargs):
@@ -274,6 +290,8 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         # Try to sync from S3 staging
         s3stage = f's3://mosfire-pipeline/RawFiles/{datemask}/'
         os.system(f'aws s3 sync {s3stage} {rawdir}/')
+
+        os.system(f'aws s3 sync s3://mosfire-pipeline/Spectra/{datemask}/ {pwd}/{datemask}/ --exclude "*" --include "*_sp.fits"')
         
         # Manual download files if missing
         fitsfiles = glob.glob(os.path.join(rawdir, '*fits'))
@@ -593,7 +611,7 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     from astropy.time import Time
     from . import extract
     
-    files = glob.glob(f'{datemask}/*/*/*/*/*-slit_*sp.fits')
+    files = glob.glob(f'{datemask}/*/*/*/*/*-slit_*_sp.fits')
     files.sort()
     
     if len(files) == 0:
