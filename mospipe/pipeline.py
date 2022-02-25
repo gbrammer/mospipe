@@ -308,7 +308,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             if os.path.exists('Driver.py'):
 
                 if ONLY_FLAT:
-                    msg = f'\n#####\n Only flats! log={os.getcwd()}/mospy.log \n ######\n')
+                    msg = f'\n#####\n Only flats! log={os.getcwd()}/mospy.log \n ######\n'
                     utils.log_comment(LOGFILE, msg, verbose=True, 
                                       show_date=True, mode='a')
 
