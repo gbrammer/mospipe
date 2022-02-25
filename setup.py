@@ -33,6 +33,8 @@ else:
 #version = "1.0.1" # Use new get_mw_dust in overlaps
 #version = "1.1" # mast products workaround
 
+version = "1.0"
+
 # Set this to true to add install_requires to setup
 # Turned off for incremental builds as it kills "reload(mastquery.query)" 
 if 0:
