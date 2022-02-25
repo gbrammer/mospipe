@@ -537,7 +537,7 @@ def run_one(**kwargs):
         
         update_mask_db_status(datemask, 1, verbose=True)
         
-        run_pipeline(kws)
+        run_pipeline(**kws)
 
 
 if __name__ == '__main__':
