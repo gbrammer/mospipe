@@ -341,7 +341,7 @@ def update_mask_db_status(datemask, status, verbose=True):
     table = 'mosfire_datemask'
     
     sqlstr = f"""UPDATE {table}
-        SET status = {status}, mtime = '{NOW}'
+        SET status = {status}, updtime = '{NOW}'
         WHERE (datemask = '{datemask}');"""
 
     if verbose:
@@ -381,11 +381,11 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     # Exposures / Masks
     exp = utils.read_catalog(f'{mask}_exposures.csv')
     exp['status'] = 2
-    exp['mtime'] = Time.now().mjd
+    exp['updtime'] = Time.now().mjd
     
     mask_cols = ['instrument', 'targname', 'koaimtyp', 'pattern', 'date_obs', 
                  'mgtname', 'maskname', 'semid', 'proginst', 'progid',
-                 'progpi', 'progtitl', 'datemask','status','mtime']
+                 'progpi', 'progtitl', 'datemask','status','updtime']
     
     exp_cols = ['datemask', 'koaid', 'ofname', 'frame', 'frameid', 'frameno', 
                 'ra', 'dec', 'ut', 'filehand', 'airmass', 'guidfwhm',
@@ -456,8 +456,8 @@ def slit_summary(mask, outfile='slit_objects.csv'):
 
     for file in files:
         sp = pyfits.open(file)
-        mtime = modtime = Time(os.path.getmtime(file), format='unix').mjd
-        row = [file, mtime]
+        modtime = modtime = Time(os.path.getmtime(file), format='unix').mjd
+        row = [file, modtime]
         for k in keys:
             row.append(sp[0].header[k])
 
