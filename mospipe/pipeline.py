@@ -108,16 +108,16 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     un = utils.Unique(mfx['datemask'])
     
-    masks = un.values
+    datemasks = un.values
     
     pop = []
     
-    for mi, mask in enumerate(masks):
+    for mi, datemask in enumerate(masks):
         
-        if ('long2pos' in mask) & (skip_long2pos):
-            print(f'Skip {mask}')
+        if ('long2pos' in datemask) & (skip_long2pos):
+            print(f'Skip {datemask}')
             
-        outdir = os.path.join(pwd, mask)
+        outdir = os.path.join(pwd, datemask)
 
         if not os.path.exists(outdir):
             spl = outdir.split('/')
@@ -129,27 +129,29 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                     os.mkdir(d)
         else:
             if skip:
-                print(f'{mask} exists, skip')
+                print(f'{datemask} exists, skip')
                 pop.append(mi)
                 continue
 
         with open(f'{pwd}/auto.log','a') as fp:
-            fp.write(f'auto  - {mask} - {time.ctime()}\n')
+            fp.write(f'auto  - {datemask} - {time.ctime()}\n')
 
-        sel = (mfx['datemask'] == mask)
+        sel = (mfx['datemask'] == datemask)
         tmp = mfx[sel]
-        print(f'{mask}  N={len(tmp)}')
-        tmp.write(os.path.join(pwd, f'{mask}_exposures.csv'), overwrite=True)
+        print(f'{datemask}  N={len(tmp)}')
+        tmp.write(os.path.join(pwd, f'{datemask}_exposures.csv'), 
+                  overwrite=True)
         
         if sel.sum() < min_nexp:
             pop.append(mi)
-            print(f'{mask}: too few exposures found ({sel.sum()} < {min_nexp}), skipping')
+            print(f'{datemask}: too few exposures found '
+                  f'({sel.sum()} < {min_nexp}), skipping')
             continue
 
         tmp['instrume'] = tmp['instrument']
         #tmp['filehand'] = [f.split('filehand=')[1] for f in tmp['fileurl']]
 
-        mask_table = os.path.join(outdir, f'{mask}.tbl')
+        mask_table = os.path.join(outdir, f'{datemask}.tbl')
         tmp['koaid','instrume','filehand'].write(mask_table, 
                                                  format='ascii.ipac', 
                                                  overwrite=True)
@@ -161,15 +163,15 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 os.mkdir(dd)
 
         ##### Download files
-        outdir = os.path.join(pwd, mask)
+        outdir = os.path.join(pwd, datemask)
 
         os.chdir(outdir)
 
-        print(f'\n{mask}: Download\n')
-        rawdir = os.path.join(pwd, mask, 'Raw')
+        print(f'\n{datemask}: Download\n')
+        rawdir = os.path.join(pwd, datemask, 'Raw')
         
         # Try to sync from S3 staging
-        s3stage = f's3://mosfire-pipeline/RawFiles/{mask}/'
+        s3stage = f's3://mosfire-pipeline/RawFiles/{datemask}/'
         os.system(f'aws s3 sync {s3stage} {rawdir}/')
         
         # Manual download files if missing
@@ -193,21 +195,22 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                          calibfile=1, cookiepath=cookiepath)   
 
         ##### Check for aborted exposures, which break the pipeline
-        rawdir = os.path.join(pwd, mask, 'Raw')
+        rawdir = os.path.join(pwd, datemask, 'Raw')
         os.chdir(rawdir)
 
         # sync to s3 staging
         os.system(f'aws s3 sync {rawdir}/ {s3stage}')
         
         # Download complete
-        update_mask_db_status(mask, 2, verbose=True)
+        update_mask_db_status(datemask, 2, verbose=True)
         
         if download_only:
+            update_mask_db_status(datemask, -2, verbose=True)
             continue
             
         files = glob.glob('MF*fits')
         if len(files) == 0:
-            print(f'No downloaded files found for mask {mask}')
+            print(f'No downloaded files found for mask {datemask}')
             continue
 
         os.system('dfits MF*fits | fitsort ABORTED > aborted.txt')
@@ -217,14 +220,14 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
         if bad.sum() > 0:
             for file in info['FILE'][bad]:
-                print(f'{mask}: remove aborted file {file}')
+                print(f'{datemask}: remove aborted file {file}')
                 os.remove(file)
         else:
-            print(f'{mask}: no aborted files')
+            print(f'{datemask}: no aborted files')
                 
         ###### Run the whole thing
-        redpath = os.path.join(pwd, mask, 'Reduced')
-        rawpath = os.path.join(pwd, mask, 'Raw')
+        redpath = os.path.join(pwd, datemask, 'Reduced')
+        rawpath = os.path.join(pwd, datemask, 'Raw')
 
         # Move files around
         os.chdir(redpath)
@@ -330,7 +333,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         
         # Extractions
         os.chdir(pwd)
-        flat_files = glob.glob(f'{mask}/*/*/*/*/*combflat_2d*fits')
+        flat_files = glob.glob(f'{datemask}/*/*/*/*/*combflat_2d*fits')
         for flat_file in flat_files:
             os.chdir(pwd)
             msk = mospipe.reduce.run_mask(flat_file, skip=skip, 
@@ -339,13 +342,13 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             
             plt.close('all')
             
-        slit_summary(mask, outfile='slit_objects.csv')
+        slit_summary(datemask, outfile='slit_objects.csv')
         
         if sync:
-            sync_results(mask, **kwargs)
+            sync_results(datemask, **kwargs)
 
 
-def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_s3=False, **kwargs):
+def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_s3=False, **kwargs):
     """
     Send files to S3 and update database
     """
@@ -356,7 +359,7 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_
     
     owd = os.getcwd()
     
-    obj_file = f'{mask}_slit_objects.csv'
+    obj_file = f'{datemask}_slit_objects.csv'
     
     if not os.path.exists(obj_file):
         return False
@@ -365,13 +368,13 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_
     df_obj = obj.to_pandas()
         
     # Exposures / Masks
-    exp = utils.read_catalog(f'{mask}_exposures.csv')
-    exp['status'] = 4
-    exp['updtime'] = Time.now().mjd
+    exp = utils.read_catalog(f'{datemask}_exposures.csv')
+    #exp['status'] = 4
+    #exp['updtime'] = Time.now().mjd
     
     mask_cols = ['instrument', 'targname', 'koaimtyp', 'pattern', 'date_obs', 
                  'mgtname', 'maskname', 'semid', 'proginst', 'progid',
-                 'progpi', 'progtitl', 'datemask','status','updtime']
+                 'progpi', 'progtitl', 'datemask']
     
     exp_cols = ['datemask', 'koaid', 'ofname', 'frame', 'frameid', 'frameno', 
                 'ra', 'dec', 'ut', 'filehand', 'airmass', 'guidfwhm',
@@ -385,36 +388,37 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_
     # Send to tables
     
     db.execute_helper('DELETE FROM mosfire_extractions WHERE '
-                       f"datemask='{mask}'", engine)
+                       f"datemask='{datemask}'", engine)
 
     db.execute_helper('DELETE FROM mosfire_exposures WHERE '
-                       f"datemask='{mask}'", engine)
+                       f"datemask='{datemask}'", engine)
     
     db.execute_helper('DELETE FROM mosfire_datemask WHERE '
-                       f"datemask='{mask}'", engine)
+                       f"datemask='{datemask}'", engine)
         
     df_mask.to_sql('mosfire_datemask', engine, index=False, 
               if_exists='append', method='multi')
     
+    update_mask_db_status(datemask, 4, verbose=True)
+    
     df_exp.to_sql('mosfire_exposures', engine, index=False, 
               if_exists='append', method='multi')
     
-    print(f'{mask}_exposures > `mosfire_exposures`, `mosfire_datemask`')
+    print(f'{datemask}_exposures > `mosfire_exposures`, `mosfire_datemask`')
 
     df_obj.to_sql('mosfire_extractions', engine, index=False, 
               if_exists='append', method='multi')
     
-    print(f'{mask}_slit_objects > `mosfire_extractions`')
+    print(f'{datemask}_slit_objects > `mosfire_extractions`')
 
-    #os.chdir(mask)
     if delete_from_s3:
-        os.system(f'aws s3 rm s3://{bucket}/{prefix}/{mask}/ --recursive')
+        os.system(f'aws s3 rm s3://{bucket}/{prefix}/{datemask}/ --recursive')
         
-    os.system(f'cd {owd}/{mask}; '+ 
-              f'aws s3 sync ./ s3://{bucket}/{prefix}/{mask}/ ' + 
+    os.system(f'cd {owd}/{datemask}; '+ 
+              f'aws s3 sync ./ s3://{bucket}/{prefix}/{datemask}/ ' + 
               '--exclude "*" --include "Reduced/*/*/[YJHK]/*"')
     
-    files = glob.glob(f'{mask}*.*g')
+    files = glob.glob(f'{datemask}*.*g')
     files.sort()
     for file in files:
         os.system(f'aws s3 cp {file} s3://{bucket}/Log/')
@@ -423,14 +427,14 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_
     return True
 
 
-def slit_summary(mask, outfile='slit_objects.csv'):
+def slit_summary(datemask, outfile='slit_objects.csv'):
     """
     Summary of *extracted* slit spectra
     """
     import astropy.io.fits as pyfits
     from astropy.time import Time
     
-    files = glob.glob(f'{mask}/*/*/*/*/*-slit_*sp.fits')
+    files = glob.glob(f'{datemask}/*/*/*/*/*-slit_*sp.fits')
     files.sort()
     
     if len(files) == 0:
@@ -485,8 +489,8 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     tab.rename_column('targname', 'target_name')
     
     if outfile:
-        tab.write(f'{mask}_{outfile}', overwrite=True)
-        print(f'Slit summary to {mask}_{outfile}')
+        tab.write(f'{datemask}_{outfile}', overwrite=True)
+        print(f'Slit summary to {datemask}_{outfile}')
     
     return tab
     
@@ -557,7 +561,7 @@ def get_random_mask(extra=''):
     engine = db.get_db_engine()
         
     all_masks = db.from_sql('SELECT DISTINCT(datemask) FROM mosfire_datemask' 
-                             ' WHERE status=0 ' + extra, engine)
+                             ' WHERE status <= 0' + extra, engine)
     
     if len(all_masks) == 0:
         return None
