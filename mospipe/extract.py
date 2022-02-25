@@ -474,7 +474,7 @@ def optimal_extract(file, show_sn=False, slx=slice(300,-300), prof_model=models.
     full_path = os.path.join(os.getcwd(), file)
     tab.meta['file'] = os.path.basename(full_path), 'Extraction filename'
     tab.meta['path'] = os.path.dirname(full_path), 'File path'
-    tab.meta['datemask'] = os.path.dirname(full_path).split('/')[8], 'Unique mask identifier'
+    tab.meta['datemask'] = im[0].header['DATEMASK'], 'Unique mask identifier'
     
     spec['opt_spec'] = tab
     
