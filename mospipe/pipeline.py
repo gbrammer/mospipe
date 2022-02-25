@@ -327,10 +327,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         slit_summary(mask, outfile='slit_objects.csv')
         
         if sync:
-            sync_results(mask)
+            sync_results(mask, **kwargs)
 
 
-def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
+def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_s3=False, **kwargs):
     """
     Send files to S3 and update database
     """
@@ -392,7 +392,9 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     print(f'{mask}_slit_objects > `mosfire_extractions`')
 
     #os.chdir(mask)
-    os.system(f'aws s3 rm s3://{bucket}/{prefix}/{mask}/ --recursive')
+    if delete_from_s3:
+        os.system(f'aws s3 rm s3://{bucket}/{prefix}/{mask}/ --recursive')
+        
     os.system(f'cd {owd}/{mask}; '+ 
               f'aws s3 sync ./ s3://{bucket}/{prefix}/{mask}/ ' + 
               '--exclude "*" --include "Reduced/*/*/[YJHK]/*"')
