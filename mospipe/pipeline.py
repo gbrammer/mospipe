@@ -112,7 +112,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     pop = []
     
-    for mi, datemask in enumerate(masks):
+    for mi, datemask in enumerate(datemasks):
         
         if ('long2pos' in datemask) & (skip_long2pos):
             print(f'Skip {datemask}')
