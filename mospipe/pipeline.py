@@ -97,13 +97,6 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     if len(mfx) < min_nexp:
         return False
-        
-    # mfx['datemask'] = [f"{mask}_{file.split('.')[1]}"
-    #                    for mask, file in zip(mfx['maskname'], mfx['koaid'])]
-    # if 'fileurl' not in mfx.colnames:
-    #     mfx['fileurl'] = [f'filehand={f}' for f in mfx['filehand']]
-    #     
-    # mfx.write(hash_file, overwrite=True)
     
     ####### Run flats
     ONLY_FLAT = True
@@ -602,7 +595,7 @@ def run_one(clean=True, **kwargs):
         run_pipeline(**kws)
         
         if clean & (len(datemask) > 0):
-            os.sytem('rm -rf {datemask}')
+            os.system('rm -rf {datemask}')
 
 
 if __name__ == '__main__':
