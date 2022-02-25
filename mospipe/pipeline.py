@@ -329,7 +329,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
             os.chdir(redpath)
                     
-        update_mask_db_status(mask, 3, verbose=True)
+        update_mask_db_status(datemask, 3, verbose=True)
         
         # Extractions
         os.chdir(pwd)
