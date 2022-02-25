@@ -46,6 +46,8 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     install_dfits()
     
+    os.chdir(pwd)
+    
     if csv_file.startswith('s3://'):
         os.system(f'aws s3 cp {csv_file} . ')
         csv_file = os.path.basename(csv_file)
