@@ -32,7 +32,7 @@ def install_dfits():
         os.system('rm -rf eso_fits_tools')
 
 
-def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, skip_long2pos=True, **kwargs):
+def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, download_only=False, skip_long2pos=True, **kwargs):
     """
     Run the pipeline to download files and extract 2D spectra
     """
@@ -198,7 +198,13 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
         # sync to s3 staging
         os.system(f'aws s3 sync {rawdir}/ {s3stage}')
-
+        
+        # Download complete
+        update_mask_db_status(mask, 2, verbose=True)
+        
+        if download_only:
+            continue
+            
         files = glob.glob('MF*fits')
         if len(files) == 0:
             print(f'No downloaded files found for mask {mask}')
@@ -320,6 +326,8 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
             os.chdir(redpath)
                     
+        update_mask_db_status(mask, 3, verbose=True)
+        
         # Extractions
         os.chdir(pwd)
         flat_files = glob.glob(f'{mask}/*/*/*/*/*combflat_2d*fits')
@@ -358,7 +366,7 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_
         
     # Exposures / Masks
     exp = utils.read_catalog(f'{mask}_exposures.csv')
-    exp['status'] = 2
+    exp['status'] = 4
     exp['updtime'] = Time.now().mjd
     
     mask_cols = ['instrument', 'targname', 'koaimtyp', 'pattern', 'date_obs', 
@@ -517,6 +525,7 @@ def update_mask_db_status(datemask, status, verbose=True):
     """
     import pandas as pd
     from astropy.time import Time
+    
     from grizli.aws import db
     engine = db.get_db_engine()
     
@@ -528,12 +537,17 @@ def update_mask_db_status(datemask, status, verbose=True):
         SET status = {status}, updtime = '{NOW}'
         WHERE (datemask = '{datemask}');"""
 
-    if verbose:
-        msg = f'Update status = {status} for {datemask} on `{table}` ({NOW})'
+    try:
+        db.execute_helper(sqlstr, engine)
+        if verbose:
+            msg = (f'Update status = {status} for {datemask} '
+                   f'on `{table}` ({NOW})'
+            print(msg)
+    except:
+        msg = (f'FAILED Update status = {status} for {datemask} '
+               f'on `{table}` ({NOW})'
         print(msg)
-
-    db.execute_helper(sqlstr, engine)
-
+        
 
 def get_random_mask(extra=''):
     """
