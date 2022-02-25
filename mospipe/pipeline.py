@@ -32,6 +32,89 @@ def install_dfits():
         os.system('rm -rf eso_fits_tools')
 
 
+def master_query():
+    """
+    """
+    import os
+    
+    if 'KOA_USERNAME' in os.environ:
+        from pykoa.koa import Koa
+        cookiepath = 'koa.kookie'
+        Koa.login(cookiepath, userid=os.environ['KOA_USERNAME'],
+                  password=os.environ['KOA_PASSWORD'], debugfile='koa.debug')
+    else:
+        from pykoa.koa import Archive
+        cookiepath = ''
+        Koa = Archive(debugfile='koa.debug')
+    
+    csv_file = 'master.csv'
+    
+    cols = ['maskname', 'filter', 'SUBSTR(koaid, 4, 8)']
+
+    query =  f"""select maskname, filter, SUBSTR(koaid, 4, 8) night, COUNT(maskname) count
+                from koa_mosfire
+                WHERE gratmode='spectroscopy' AND koaimtyp='object'
+                AND maskname NOT LIKE '%%(align)%%'
+                AND maskname NOT LIKE '%%long2pos%%'                
+                AND (progid = 'U190' OR progid = 'N097')
+                GROUP BY maskname, filter, SUBSTR(koaid, 4, 8)
+                """
+    
+    cos = "(contains(point('J2000',ra ,dec), circle('J2000', 150.1 2.0, 1.6))=1)"
+    uds = "(contains(point('J2000',ra ,dec), circle('J2000', 34.409 -5.163, 2.0))=1)"
+    gds = "(contains(point('J2000',ra ,dec), circle('J2000', 53.110 -27.830, 1.0))=1)"
+    egs = "(contains(point('J2000',ra ,dec), circle('J2000', 214.8288 52.8067, 1.8))=1)"
+    gdn = "(contains(point('J2000',ra ,dec), circle('J2000', 189.236	62.257, 1.8))=1)"
+    
+    query =  f"""select maskname, filter, SUBSTR(koaid, 4, 8) night, COUNT(maskname) count
+                from koa_mosfire
+                WHERE gratmode='spectroscopy' AND koaimtyp='object'
+                AND maskname NOT LIKE '%%(align)%%'
+                AND maskname NOT LIKE '%%long2pos%%'                
+                AND ({egs} OR {cos} OR {uds} OR {gds} OR {gdn})
+                AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
+                GROUP BY maskname, filter, SUBSTR(koaid, 4, 8)
+                """
+    
+    print(f'======= Query ======= \n{query}\n ===============')
+
+    Koa.query_adql(query, csv_file, overwrite=True, format='csv', 
+                   cookiepath=cookiepath)
+    
+    res = utils.read_catalog(csv_file)
+    res['datemask'] = [f'{m}_{d}' for m, d in zip(res['maskname'], res['night'])]
+    
+    so = np.argsort(res['night'])[::-1]
+    res = res[so]
+    
+    done = db.from_sql('select datemask, progid from mosfire_datemask', engine)
+    skip = False
+    for d in done['datemask']:
+        skip |= res['datemask'] == d
+    
+    res['status'] = 0
+    hyp = np.array(['Hyperi' in d for d in res['datemask']])
+    new = np.array([d > 20220000 for d in res['night']])
+    highz = np.array(['z8' in d.lower() for d in res['datemask']])
+    highz |= np.array(['z7' in d.lower() for d in res['datemask']])
+    highz |= np.array(['z5' in d.lower() for d in res['datemask']])
+    highz |= np.array(['z6' in d.lower() for d in res['datemask']])
+    highz |= np.array(['z9' in d.lower() for d in res['datemask']])
+    highz |= np.array(['z10' in d.lower() for d in res['datemask']])
+    highz |= np.array(['red' in d.lower() for d in res['datemask']])
+    highz |= np.array(['nug' in d.lower() for d in res['datemask']])
+    
+    keep = (~skip) & (hyp | new | highz)
+    
+    un = utils.Unique(res['datemask'][keep], verbose=False)
+    df = pd.DataFrame()
+    df['datemask'] = un.values
+    df['status'] = 0
+        
+    df.to_sql('mosfire_datemask', engine, index=False, 
+              if_exists='append', method='multi')
+    
+    
 def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, download_only=False, skip_long2pos=True, **kwargs):
     """
     Run the pipeline to download files and extract 2D spectra
@@ -308,7 +391,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             if os.path.exists('Driver.py'):
 
                 if ONLY_FLAT:
-                    msg = f'\n#####\n Only flats! log={os.getcwd()}/mospy.log \n ######\n'
+                    msg = f'Only flats! log={os.getcwd()}/mospy.log'
                     utils.log_comment(LOGFILE, msg, verbose=True, 
                                       show_date=True, mode='a')
 
@@ -338,7 +421,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                     os.system(f'{sys.executable} RunFlat.py > mospy.log')
 
                 else:
-                    msg = f'\n#####\n Running Driver.py, log={os.getcwd()}/mospy.log \n ######\n'
+                    msg = f'Running Driver.py, log={os.getcwd()}/mospy.log'
                     utils.log_comment(LOGFILE, msg, verbose=True, 
                                       show_date=True, mode='a')
                                       
@@ -708,6 +791,58 @@ def setup_db_tables():
     # Test
     
 
+def get_oned_wavelengths(binw=50, filter='K'):
+    """
+    Get log-spaced wavelengths of 1d spectra in the database tables
+    """
+    
+    wlim = {'Y':( 9614.2, 11348.8),
+            'J':(11453.2, 13548.7),
+            'H':(14594.2, 18137.4),
+            'K':(18905.9, 24146.9)}
+    
+    logw = utils.log_zgrid([3000, 2.5e4], binw/3.e5)
+
+    logw = (logw[:-1]+np.diff(logw)/2.).astype(np.float32)
+    clip = (logw > wlim[filter][0]) & (logw < wlim[filter][1])
+    logw = logw[clip]
+    
+    return logw
+    
+    if False:
+        
+        filt = 'K'
+        
+        oned = db.from_sql(f"select datemask,ra_targ as ra, dec_targ as dec, target_name,slitnum,exptime,sn50,nline,linew00,linef00,flux,err,lineflux,lineerr from mosfire_spectra_{filt.lower()} natural join mosfire_extractions where filter = '{filt}' AND datemask like '%%ID3%%' ORDER BY sn50 DESC", engine)
+        print(filt, len(oned))
+        logw = get_oned_wavelengths(filter=filt.upper())/1.e4
+        
+        i = -1
+        
+        i+=1
+        
+        fig, ax = plt.subplots(1,1,figsize=(10,3))
+        msk = np.array(oned['lineerr'][i]) < 5*np.nanmedian(oned['lineerr'][i]) 
+        ax.plot(logw[msk], np.array(oned['flux'][i])[msk]*5, color='pink', alpha=0.8)
+        ax.plot(logw[msk], np.array(oned['lineerr'][i])[msk], color='0.8', alpha=0.8)
+        ax.plot(logw[msk], np.array(oned['lineflux'][i])[msk], color='k', alpha=0.8)
+        
+        ymax = np.maximum(oned['linef00'][i], 5*np.nanmedian(oned['lineerr'][i]))
+        ax.set_ylim(-0.5*ymax, 1.5*ymax)
+        
+        ax.vlines(oned['linew00'][i]/1.e4, *ax.get_ylim(), color='r', linestyle=':')
+        ax.hlines(0, *ax.get_xlim(), color='orange', linestyle='--')
+        
+        
+        ax.set_xlim(logw[0], logw[-1])
+        ax.grid()
+        ax.set_xlabel(f'$\lambda$ [$\mu$m]')
+        ax.text(0.05, -0.1, f"{oned['datemask'][i]}", ha='left', va='top', transform=ax.transAxes, fontsize=8)
+        ax.text(0.95, -0.1, f"{oned['slitnum'][i]} - {oned['target_name'][i]}", ha='right', va='top', transform=ax.transAxes, fontsize=8)
+
+        fig.tight_layout(pad=0.2)
+        
+        
 def update_mask_db_status(datemask, status, verbose=True):
     """
     Set status flag of a mask in the `mosfire_datemask` table
@@ -738,7 +873,7 @@ def update_mask_db_status(datemask, status, verbose=True):
         print(msg)
         
 
-def get_random_mask(extra=''):
+def get_random_mask(extra='', status='status = 0', **kwargs):
     """
     Find a mask that needs processing
     """
@@ -746,7 +881,7 @@ def get_random_mask(extra=''):
     engine = db.get_db_engine()
         
     all_masks = db.from_sql('SELECT DISTINCT(datemask) FROM mosfire_datemask' 
-                             ' WHERE status <= 0' + extra, engine)
+                             f' WHERE {status} ' + extra, engine)
     
     if len(all_masks) == 0:
         return None
@@ -765,7 +900,8 @@ def run_one(clean=True, **kwargs):
 
     engine = db.get_db_engine()
 
-    datemask = get_random_mask()
+    datemask = get_random_mask(**kwargs)
+    
     if datemask is None:
         with open('/GrizliImaging/mosfire_finished.txt','w') as fp:
             fp.write(time.ctime() + '\n')
