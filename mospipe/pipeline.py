@@ -12,13 +12,18 @@ def install_dfits():
     """
     import os
     import sys
+    import secrets
+    
     binpath = os.path.dirname(sys.executable)
     
-    os.system('dfits > dfits.log')
-    with open('dfits.log') as fp:
+    hash_key = secrets.token_urlsafe(16)[:6]
+    hash_file = f'dfits.{hash_key}.log'
+    
+    os.system(f'dfits > {hash_file}')
+    with open(hash_file) as fp:
         lines = fp.readlines()
     
-    os.remove('dfits.log')
+    os.remove(hash_file)
     
     repo = 'https://github.com/granttremblay/eso_fits_tools.git'
     
