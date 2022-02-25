@@ -109,6 +109,8 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     
     for mi, datemask in enumerate(datemasks):
         
+        LOGFILE = f'/GrizliImaging/{datemask}.pipeline.log'
+        
         if ('long2pos' in datemask) & (skip_long2pos):
             print(f'Skip {datemask}')
             
@@ -124,7 +126,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                     os.mkdir(d)
         else:
             if skip:
-                print(f'{datemask} exists, skip')
+                msg = f'{datemask} exists, skip'
+                utils.log_comment(LOGFILE, msg, verbose=True, 
+                                  show_date=True, mode='a')
+                    
                 pop.append(mi)
                 continue
 
@@ -133,14 +138,21 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
         sel = (mfx['datemask'] == datemask)
         tmp = mfx[sel]
-        print(f'{datemask}  N={len(tmp)}')
+        msg = f'{datemask}  N={len(tmp)}'
+        utils.log_comment(LOGFILE, msg, verbose=True, 
+                          show_date=True, mode='a')
+            
         tmp.write(os.path.join(pwd, f'{datemask}_exposures.csv'), 
                   overwrite=True)
         
         if sel.sum() < min_nexp:
             pop.append(mi)
-            print(f'{datemask}: too few exposures found '
+            msg = (f'{datemask}: too few exposures found '
                   f'({sel.sum()} < {min_nexp}), skipping')
+
+            utils.log_comment(LOGFILE, msg, verbose=True, 
+                              show_date=True, mode='a')
+                
             continue
 
         tmp['instrume'] = tmp['instrument']
@@ -162,7 +174,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
         os.chdir(outdir)
 
-        print(f'\n{datemask}: Download\n')
+        msg = f'\n{datemask}: Download\n'
+        utils.log_comment(LOGFILE, msg, verbose=True, 
+                          show_date=True, mode='a')
+            
         rawdir = os.path.join(pwd, datemask, 'Raw')
         
         # Try to sync from S3 staging
@@ -205,7 +220,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             
         files = glob.glob('MF*fits')
         if len(files) == 0:
-            print(f'No downloaded files found for mask {datemask}')
+            msg = f'No downloaded files found for mask {datemask}'
+            utils.log_comment(LOGFILE, msg, verbose=True, 
+                              show_date=True, mode='a')
+                
             continue
 
         os.system('dfits MF*fits | fitsort ABORTED > aborted.txt')
@@ -215,10 +233,14 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
 
         if bad.sum() > 0:
             for file in info['FILE'][bad]:
-                print(f'{datemask}: remove aborted file {file}')
+                msg = f'{datemask}: remove aborted file {file}'
+                utils.log_comment(LOGFILE, msg, verbose=True, 
+                                  show_date=True, mode='a')
                 os.remove(file)
         else:
-            print(f'{datemask}: no aborted files')
+            msg = f'{datemask}: no aborted files'
+            utils.log_comment(LOGFILE, msg, verbose=True, 
+                              show_date=True, mode='a')
                 
         ###### Run the whole thing
         redpath = os.path.join(pwd, datemask, 'Reduced')
@@ -228,11 +250,16 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         os.chdir(redpath)
         os.system('rm ../Raw/translate.csh')
 
-        print(f'\n {redpath}: translator\n')
+        msg = f'\n {redpath}: translator\n'
+        utils.log_comment(LOGFILE, msg, verbose=True, 
+                          show_date=True, mode='a')
+            
         os.system(f'koa_translator_mod {rawpath}')
 
         # "handle" masks/filters
-        print(f'\n {redpath}: handle\n')
+        msg = f'\n {redpath}: handle\n'
+        utils.log_comment(LOGFILE, msg, verbose=True, 
+                          show_date=True, mode='a')
 
         os.system(f'{sys.executable} {binpath}/mospy_handle.py '+ 
                   f'{redpath}/MOSFIRE/*/*/*fits > handle.log')
@@ -269,7 +296,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 continue
 
             os.chdir(dir)
-            print(f'===========\nProcess mask {dir}\n============')
+            msg = f'===========\nProcess mask {dir}\n============'
+            utils.log_comment(LOGFILE, msg, verbose=True, 
+                              show_date=True, mode='a')
+                              
             os.system(f'{sys.executable} {binpath}/AutoDriver.py')
 
             longfiles = glob.glob('Long*py')
@@ -278,15 +308,23 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             if os.path.exists('Driver.py'):
 
                 if ONLY_FLAT:
-                    print(f'\n#####\n Only flats! log={os.getcwd()}/mospy.log \n ######\n')
+                    msg = f'\n#####\n Only flats! log={os.getcwd()}/mospy.log \n ######\n')
+                    utils.log_comment(LOGFILE, msg, verbose=True, 
+                                      show_date=True, mode='a')
 
                     flat_files = glob.glob('combflat*')
                     if len(flat_files) > 0:
-                        print(f'Flat files found: {flat_files}, skip')
+                        msg = f'Flat files found: {flat_files}, skip'
+                        utils.log_comment(LOGFILE,
+                            msg, verbose=True, show_date=True, mode='a')
+                            
                         continue
-
+                    
                     # Only up to flats
-                    print('Run only flat')
+                    msg = 'Run only flat'
+                    utils.log_comment(LOGFILE, msg, verbose=True, 
+                                      show_date=True, mode='a')
+                                      
                     with open('Driver.py') as fp:
                         lines = fp.readlines()
 
@@ -300,7 +338,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                     os.system(f'{sys.executable} RunFlat.py > mospy.log')
 
                 else:
-                    print(f'\n#####\n Running Driver.py, log={os.getcwd()}/mospy.log \n ######\n')
+                    msg = f'\n#####\n Running Driver.py, log={os.getcwd()}/mospy.log \n ######\n'
+                    utils.log_comment(LOGFILE, msg, verbose=True, 
+                                      show_date=True, mode='a')
+                                      
                     os.system('perl -pi -e "s/Extract.extract_spectra/# Extract.extract_spectra/" Driver.py')
                     os.system(f'{sys.executable} Driver.py > mospy.log')
 
@@ -309,7 +350,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 pyfile = longfiles[0]
 
                 # Only up to flats
-                print('Run only flat')
+                msg = 'Run only flat'
+                utils.log_comment(LOGFILE, msg, verbose=True, 
+                                  show_date=True, mode='a')
+                                  
                 with open(pyfile) as fp:
                     lines = fp.readlines()
 
@@ -381,7 +425,13 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
     df_exp = exp[exp_cols].to_pandas()
 
     # Send to tables
-    
+    files = glob.glob(f'{datemask}/*/*/*/*/*log1d.fits')
+    files.sort()    
+    filters = np.unique([f.split('/')[-2].lower() for f in files])
+    for f in filters:
+        db.execute_helper(f'DELETE FROM mosfire_spectra_{f} WHERE '
+                       f"datemask='{datemask}'", engine)
+                       
     db.execute_helper('DELETE FROM mosfire_extractions WHERE '
                        f"datemask='{datemask}'", engine)
 
@@ -407,14 +457,6 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
     print(f'{datemask}_slit_objects > `mosfire_extractions`')
     
     # 1D spectra
-    files = glob.glob(f'{datemask}/*/*/*/*/*log1d.fits')
-    files.sort()
-    
-    filters = np.unique([f.split('/')[-2].lower() for f in files])
-    for f in filters:
-        db.execute_helper(f'DELETE FROM mosfire_spectra_{f} WHERE '
-                       f"datemask='{datemask}'", engine)
-    
     for file in files:
         spec = utils.read_catalog(file)
         
@@ -429,7 +471,8 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
         
         oned_table = f"mosfire_spectra_{spec.meta['FILTER']}".lower()
         msg = f'{os.path.basename(file)} > `{oned_table}`'
-        print(msg)
+        utils.log_comment(f'/GrizliImaging/{datemask}.pipeline.log',
+            msg, verbose=True, show_date=True, mode='a')
         
         df.to_sql(oned_table, 
                   engine, index=False, 
@@ -544,11 +587,13 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
                 oned_row.append(val)
             
             msg = f'{datemask}: 1D extraction for {file}'
-            print(msg)
+            utils.log_comment(f'/GrizliImaging/{datemask}.pipeline.log',
+                msg, verbose=True, show_date=True, mode='a')
             
         except:
             msg = f'{datemask}: 1D extraction *failed* for {file}'
-            print(msg)
+            utils.log_comment(f'/GrizliImaging/{datemask}.pipeline.log',
+                msg, verbose=True, show_date=True, mode='a')
             
             oned_row = []
             for k in oned_cols:
@@ -588,8 +633,10 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     
     if outfile:
         tab.write(f'{datemask}_{outfile}', overwrite=True)
-        print(f'Slit summary to {datemask}_{outfile}')
-    
+        msg = f'Slit summary to {datemask}_{outfile}'
+        utils.log_comment(f'/GrizliImaging/{datemask}.pipeline.log',
+            msg, verbose=True, show_date=True, mode='a')
+            
     return tab
     
     
