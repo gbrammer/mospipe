@@ -510,7 +510,7 @@ def get_random_mask(extra=''):
     return random_mask
 
 
-def run_one(**kwargs):
+def run_one(clean=True, **kwargs):
     """
     Process a with status=0
     """
@@ -538,6 +538,9 @@ def run_one(**kwargs):
         update_mask_db_status(datemask, 1, verbose=True)
         
         run_pipeline(**kws)
+        
+        if clean & (len(datemask) > 0):
+            os.sytem('rm -rf {datemask}')
 
 
 if __name__ == '__main__':
