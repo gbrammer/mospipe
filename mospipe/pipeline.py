@@ -32,7 +32,7 @@ def install_dfits():
         os.system('rm -rf eso_fits_tools')
 
 
-def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, **kwargs):
+def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, skip_long2pos=True, **kwargs):
     """
     Run the pipeline to download files and extract 2D spectra
     """
@@ -113,7 +113,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     pop = []
     
     for mi, mask in enumerate(masks):
-
+        
+        if ('long2pos' in mask) & (skip_long2pos):
+            print(f'Skip {mask}')
+            
         outdir = os.path.join(pwd, mask)
 
         if not os.path.exists(outdir):
@@ -327,30 +330,6 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             sync_results(mask)
 
 
-def update_mask_db_status(datemask, status, verbose=True):
-    """
-    Set status flag of a mask in the `mosfire_datemask` table
-    """
-    import pandas as pd
-    from astropy.time import Time
-    from grizli.aws import db
-    engine = db.get_db_engine()
-    
-    NOW = Time.now().mjd
-    
-    table = 'mosfire_datemask'
-    
-    sqlstr = f"""UPDATE {table}
-        SET status = {status}, updtime = '{NOW}'
-        WHERE (datemask = '{datemask}');"""
-
-    if verbose:
-        msg = f'Update status = {status} for {datemask} on `{table}` ({NOW})'
-        print(msg)
-
-    db.execute_helper(sqlstr, engine)
-
-
 def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     """
     Send files to S3 and update database
@@ -486,6 +465,8 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     so = np.argsort(tab['slitnum'])
     tab = tab[so]
     
+    tab.rename_column('targname', 'target_name')
+    
     if outfile:
         tab.write(f'{mask}_{outfile}', overwrite=True)
         print(f'Slit summary to {mask}_{outfile}')
@@ -493,6 +474,58 @@ def slit_summary(mask, outfile='slit_objects.csv'):
     return tab
     
     
+def setup_db_tables():
+    """
+    Set up table indices
+    """
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    engine.execute('ALTER TABLE mosfire_datemask ADD PRIMARY KEY (datemask)')
+    
+    SQL = """
+    ALTER TABLE mosfire_exposures 
+    ADD CONSTRAINT fk_exp_datemask 
+    FOREIGN KEY (datemask) 
+    REFERENCES mosfire_datemask (datemask);
+    """
+    engine.execute(SQL)
+
+    SQL = """
+    ALTER TABLE mosfire_extractions 
+    ADD CONSTRAINT fk_ext_datemask 
+    FOREIGN KEY (datemask) 
+    REFERENCES mosfire_datemask (datemask);
+    """
+    engine.execute(SQL)
+
+    # Test
+    
+
+def update_mask_db_status(datemask, status, verbose=True):
+    """
+    Set status flag of a mask in the `mosfire_datemask` table
+    """
+    import pandas as pd
+    from astropy.time import Time
+    from grizli.aws import db
+    engine = db.get_db_engine()
+    
+    NOW = Time.now().mjd
+    
+    table = 'mosfire_datemask'
+    
+    sqlstr = f"""UPDATE {table}
+        SET status = {status}, updtime = '{NOW}'
+        WHERE (datemask = '{datemask}');"""
+
+    if verbose:
+        msg = f'Update status = {status} for {datemask} on `{table}` ({NOW})'
+        print(msg)
+
+    db.execute_helper(sqlstr, engine)
+
+
 def get_random_mask(extra=''):
     """
     Find a mask that needs processing
