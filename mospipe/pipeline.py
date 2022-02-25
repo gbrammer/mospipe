@@ -377,12 +377,7 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
     
     db.execute_helper('DELETE FROM mosfire_datemask WHERE '
                        f"datemask='{mask}'", engine)
-    
-    df_obj.to_sql('mosfire_extractions', engine, index=False, 
-              if_exists='append', method='multi')
-    
-    print(f'{mask}_slit_objects > `mosfire_extractions`')
-    
+        
     df_mask.to_sql('mosfire_datemask', engine, index=False, 
               if_exists='append', method='multi')
     
@@ -390,6 +385,11 @@ def sync_results(mask, bucket='mosfire-pipeline', prefix='Spectra'):
               if_exists='append', method='multi')
     
     print(f'{mask}_exposures > `mosfire_exposures`, `mosfire_datemask`')
+
+    df_obj.to_sql('mosfire_extractions', engine, index=False, 
+              if_exists='append', method='multi')
+    
+    print(f'{mask}_slit_objects > `mosfire_extractions`')
 
     #os.chdir(mask)
     os.system(f'aws s3 rm s3://{bucket}/{prefix}/{mask}/ --recursive')
