@@ -2172,8 +2172,10 @@ class MosfireMask(object):
         self.pipeline_status = True
 
 
-    def extract_all_slits(self, slit_numbers=None, show_trace=False, show_drizzled=False, pad=8, sig_clip=(3, 3), mask_offset=False, mask_trace=False, mask_overlap=False, mask_single=False, kernel='point', pixfrac=1, linearize_wave=True, log_wave=False, zoom=35, **kwargs):    
-        # Extract all slits        
+    def extract_all_slits(self, slit_numbers=None, show_trace=False, show_drizzled=False, pad=8, sig_clip=(3, 3), mask_offset=False, mask_trace=False, mask_overlap=False, mask_single=False, kernel='point', pixfrac=1, linearize_wave=True, log_wave=False, zoom=35, save_full_drizzled=False, **kwargs):    
+        """
+        Extract 2D spectra for all slits
+        """
         if slit_numbers is None:
             slit_numbers = range(self.nslits)
             
@@ -2210,10 +2212,25 @@ class MosfireMask(object):
             self.slit_info[slit] = slit_info
 
             file = os.path.join(self.path, f'{key}_sp.fits')
-            msg = f'{self.namestr} # Slit {slit} / {self.nslits} {file}' 
+            msg = f'{self.namestr} # slitidx {slit} / {self.nslits} {file}' 
             utils.log_comment(self.logfile, msg, verbose=True)
             self.slit_hdus[slit].writeto(file, overwrite=True)
             
+            if save_full_drizzled:
+                xfile = os.path.join(self.path, f'{key}_xsp.fits')
+
+                xhdu = pyfits.HDUList()
+                xhead, xsci, xwht = self.drizzled_plans[0]
+                xhead['EXTNAME'] = 'SCI'
+                xhdu.append(pyfits.PrimaryHDU(data=xsci, header=xhead))
+                xhead['EXTNAME'] = 'WHT'
+                xhdu.append(pyfits.ImageHDU(data=xwht, header=xhead))
+
+                xmsg = f'{self.namestr} # Full drizzled file {xfile}' 
+                utils.log_comment(self.logfile, xmsg, verbose=True)
+                xhdu.writeto(xfile, overwrite=True)
+                del(xhdu)
+                
             if show_drizzled:
                 try:
                     fig = show_drizzled_hdu(hdu, vm=None,
@@ -2238,6 +2255,7 @@ class MosfireMask(object):
                     
                 
         return True
+
 
 class ExposureGroup(object):
     """
@@ -2835,6 +2853,7 @@ def fit_vega_spectrum(hip_wave, hip_flux, hip_err, hip_mag=8.503, filter='K', df
     
     return to_flam
 
+
 def run_mask(flat, skip=True, **kwargs):
     import time
     
@@ -2851,12 +2870,13 @@ def run_mask(flat, skip=True, **kwargs):
     mask = MosfireMask(path=path, min_nexp=0)
     
     mask.pipeline(align_peak=True, **kwargs)
+    
     if len(mask.plans) == 0:
         msg = f'{mask.namestr} # No plans found'
         utils.log_comment(mask.logfile, msg, verbose=True)
         return False
         
-    mask.extract_all_slits(slit_numbers=None, show_drizzled=True, zoom=35, **kwargs)
+    mask.extract_all_slits(show_drizzled=True, zoom=35, **kwargs)
     
     plt.close('all')
     
