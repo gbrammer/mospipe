@@ -890,7 +890,7 @@ def get_random_mask(extra='', status='status = 0', **kwargs):
     return random_mask
 
 
-def run_one(clean=True, **kwargs):
+def run_one(datemask=None, clean=True, **kwargs):
     """
     Process a with status=0
     """
@@ -900,7 +900,8 @@ def run_one(clean=True, **kwargs):
 
     engine = db.get_db_engine()
 
-    datemask = get_random_mask(**kwargs)
+    if datemask is None:
+        datemask = get_random_mask(**kwargs)
     
     if datemask is None:
         with open('/GrizliImaging/mosfire_finished.txt','w') as fp:
