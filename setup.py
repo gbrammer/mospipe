@@ -23,17 +23,7 @@ else:
     version_hash = '---'
     version = long_version
     
-# version = "0.1.8"
-# version = "0.1.9" # Fix file extensions
-# version = "0.2.0" # Minor changes
-# version = "0.3.0" # New target formatting
-# version = "0.4.0" # Try to use astroquery rather than MAST CAOM
-# version = "0.4.1" # Bug in shapes
-#version = "1.0" # Stable release, dustmaps dust
-#version = "1.0.1" # Use new get_mw_dust in overlaps
-#version = "1.1" # mast products workaround
-
-version = "1.0"
+# version = "1.0" # pipeline with database
 
 # Set this to true to add install_requires to setup
 # Turned off for incremental builds as it kills "reload(mastquery.query)" 
