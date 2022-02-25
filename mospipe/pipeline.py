@@ -36,6 +36,9 @@ def master_query():
     """
     """
     import os
+    import pandas as pd
+    from grizli.aws import db
+    engine = db.get_db_engine()
     
     if 'KOA_USERNAME' in os.environ:
         from pykoa.koa import Koa
@@ -616,6 +619,9 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     
     if False:
         ## Add columns to database
+        from grizli.aws import db
+        engine = db.get_db_engine()
+        
         for k in oned_cols:
             if k in oned_ints:
                 dtype = 'INT'
@@ -810,6 +816,9 @@ def get_oned_wavelengths(binw=50, filter='K'):
     return logw
     
     if False:
+        import matplotlib.pyplot as plt
+        from grizli.aws import db
+        engine = db.get_db_engine()
         
         filt = 'K'
         

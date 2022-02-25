@@ -2090,6 +2090,8 @@ class MosfireMask(object):
 
             except TypeError:
                 pass
+            except IndexError:
+                pass
 
 
         else:
@@ -2185,8 +2187,7 @@ class MosfireMask(object):
                             
         for slit in slit_numbers:
             key = self.target_keys[slit]
-            try:
-                
+            try:                
                 slit_info, fig = self.get_slit_params(slit=slit, xy_order=3, 
                                                       pad=pad, 
                                                       show=show_trace)
@@ -2194,6 +2195,9 @@ class MosfireMask(object):
                     fig.savefig(os.path.join(self.path, f'{key}_slit.png'))
                     
             except TypeError:
+                utils.log_exception(self.logfile, traceback)
+                continue
+            except IndexError:
                 utils.log_exception(self.logfile, traceback)
                 continue
 
