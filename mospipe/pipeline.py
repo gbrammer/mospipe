@@ -923,8 +923,10 @@ def run_one(clean=True, **kwargs):
             
         run_pipeline(**kws)
         
+        os.chdir('/GrizliImaging/')
+        
         if clean & (len(datemask) > 0):
-            os.system(f'rm -rf {datemask}')
+            os.system(f'rm -rf /GrizliImaging/{datemask}')
 
 
 if __name__ == '__main__':
