@@ -2172,13 +2172,17 @@ class MosfireMask(object):
         self.pipeline_status = True
 
 
-    def extract_all_slits(self, slit_numbers=None, show_trace=False, show_drizzled=False, pad=8, sig_clip=(3, 3), mask_offset=False, mask_trace=False, mask_overlap=False, mask_single=False, kernel='point', pixfrac=1, linearize_wave=True, log_wave=False, zoom=35, save_full_drizzled=False, **kwargs):    
+    def extract_all_slits(self, slit_numbers=None, orig_slit_numbers=None, show_trace=False, show_drizzled=False, pad=8, sig_clip=(3, 3), mask_offset=False, mask_trace=False, mask_overlap=False, mask_single=False, kernel='point', pixfrac=1, linearize_wave=True, log_wave=False, zoom=35, save_full_drizzled=False, **kwargs):    
         """
         Extract 2D spectra for all slits
         """
         if slit_numbers is None:
             slit_numbers = range(self.nslits)
-            
+        
+        if orig_slit_numbers is not None:
+            slit_numbers = [self.target_slit_numbers.index(s)
+                            for s in orig_slit_numbers]
+                            
         for slit in slit_numbers:
             key = self.target_keys[slit]
             try:
