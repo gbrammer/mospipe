@@ -510,9 +510,9 @@ def get_random_mask(extra=''):
     return random_mask
 
 
-def run_all(**kwargs):
+def run_one(**kwargs):
     """
-    Process all mask with status=0
+    Process a with status=0
     """
     import os
     import time
@@ -520,30 +520,25 @@ def run_all(**kwargs):
 
     engine = db.get_db_engine()
 
-    nmask = db.from_sql('select count(distinct(datemask)) '
-                         ' from mosfire_datemask WHERE status = 0', 
-                         engine)['count'][0]
-
-    assoc = -1
-    j = 0
-    while (assoc is not None) & (j < nmask):
-        j += 1
-        datemask = get_random_mask()
-        if assoc is not None:
-            print(f'==============  Run datemask  ===============')
-            print(f'{j}: {datemask}')
-            print(f'========= {time.ctime()} ==========')
-            
-            maskname = '_'.join(datemask.split('_')[:-1])
-            koaid = 'MF.{0}'.format(datemask.split('_')[-1])
-            query = f"AND koaid LIKE '{koaid}%%' AND maskname='{maskname}'"
-            kws = dict(extra_query=query, 
-                       csv_file=f'mosfire.{datemask}.csv', 
-                       **kwargs)
-            
-            update_mask_db_status(datemask, 1, verbose=True)
-            
-            run_pipeline(kws)
+    datemask = get_random_mask()
+    if datemask is None:
+        with open('/GrizliImaging/mosfire_finished.txt','w') as fp:
+            fp.write(time.ctime() + '\n')
+    else:
+        print(f'==============  Run datemask  ===============')
+        print(f'{j}: {datemask}')
+        print(f'========= {time.ctime()} ==========')
+        
+        maskname = '_'.join(datemask.split('_')[:-1])
+        koaid = 'MF.{0}'.format(datemask.split('_')[-1])
+        query = f"AND koaid LIKE '{koaid}%%' AND maskname='{maskname}'"
+        kws = dict(extra_query=query, 
+                   csv_file=f'mosfire.{datemask}.csv', 
+                   **kwargs)
+        
+        update_mask_db_status(datemask, 1, verbose=True)
+        
+        run_pipeline(kws)
 
 
 if __name__ == '__main__':
