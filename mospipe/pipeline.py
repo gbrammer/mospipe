@@ -526,8 +526,7 @@ def run_one(**kwargs):
             fp.write(time.ctime() + '\n')
     else:
         print(f'==============  Run datemask  ===============')
-        print(f'{j}: {datemask}')
-        print(f'========= {time.ctime()} ==========')
+        print(f'{time.ctime()}   {datemask}')
         
         maskname = '_'.join(datemask.split('_')[:-1])
         koaid = 'MF.{0}'.format(datemask.split('_')[-1])
