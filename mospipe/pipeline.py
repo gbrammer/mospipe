@@ -136,6 +136,14 @@ def master_query():
     
     # Full extractions
     run_one(datemask='cosmos_ID3_20220223', delete_from_s3=False, orig_slit_numbers=[17], save_full_drizzled=True, clean=False, skip=False)
+
+    run_one(datemask='C2020_maskID2B_20220123', delete_from_s3=False, orig_slit_numbers=[13], save_full_drizzled=True, clean=False, skip=False)
+
+    run_one(datemask='C2020_maskID2_20220114', delete_from_s3=False, orig_slit_numbers=[12], save_full_drizzled=True, clean=False, skip=False)
+
+    run_one(datemask='C2020_maskID1B_20220123', delete_from_s3=False, orig_slit_numbers=[28], save_full_drizzled=True, clean=False, skip=False)
+
+    run_one(datemask='C2020_maskID1_20220114', delete_from_s3=False, orig_slit_numbers=[3], save_full_drizzled=True, clean=False, skip=False)
     
     
     
@@ -816,6 +824,7 @@ def setup_db_tables():
     engine.execute(SQL)
     
     engine.execute('GRANT ALL PRIVILEGES ON ALL TABLEs IN SCHEMA public TO db_iam_user')
+    engine.execute('GRANT SELECT ON ALL TABLEs IN SCHEMA public TO redshift_fit_public')
     
     # Test
     
@@ -962,8 +971,37 @@ def run_one(datemask=None, clean=True, **kwargs):
             os.system(f'rm -rf /GrizliImaging/{datemask}')
 
 
-if __name__ == '__main__':
-    argv = sys.argv
+def parse_sys_argv(argv):
+    """
+    Parse keywords and boolean switches from sys.argv
+    
+    Parameters
+    ----------
+    argv : list
+    
+        ```
+        ./test.py xxx --word=test --boolean=True --integer=3 --float=4.345 \
+                      --quoted="[(*this is a string = 3.4)" \
+                      --nan_val=nan --none_val=None --inf_val=inf \
+                      --neg_int=-3 --neg-float=-3.1415 \
+                      -false_switch +true_switch
+        ```
+    
+    Returns
+    -------
+    kws : dict
+        
+        ```
+        {'word': 'test', 'boolean': True, 'integer': 3, 'float': 4.345, 
+         'quoted': '[(*this is a string = 3.4)',
+         'nan_val': nan, 'none_val': None, 'inf_val': inf,
+         'neg_int': -3, 'neg-float': -3.1415,
+         'false_switch': False, 'true_switch': True}
+        ```
+    
+    """
+    import numpy as np
+    
     kws = {}
     for arg in sys.argv:
         if arg.startswith('--') & ('=' in arg):
@@ -974,15 +1012,40 @@ if __name__ == '__main__':
                 val = False
             elif val.lower() == 'true':
                 val = True
-
+            elif val.lower() == 'none':
+                val = None
+            elif val.lower() == 'inf':
+                val = np.inf
+            elif val.lower() == 'nan':
+                val = np.nan
+                
             if isinstance(val, str):
                 try:
                     val = int(val)
                 except ValueError:
-                    pass
+                    try:
+                        val = float(val)
+                    except ValueError:
+                        pass
         
             kws[kw] = val
             
+        elif arg.startswith('-') & (arg[1] != '-'):
+            # False switch
+            kw = arg[1:]
+            kws[kw] = False
+        
+        elif arg.startswith('+'):
+            # True switch
+            kw = arg[1:]
+            kws[kw] = True
+            
+    return kws
+
+
+if __name__ == '__main__':
+    argv = sys.argv
+    kws = parse_sys_argv(argv)
     print(f'Run pipeline with kwargs: {kws}')
     
     if ('extra_query' in kws) | ('csv_file' in kws):
