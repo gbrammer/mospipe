@@ -94,14 +94,7 @@ def master_query():
     #
     query =  f"""select maskname, gratmode, koaimtyp, filter, progpi, progid, SUBSTR(koaid, 4, 8) night, ra, dec, object
     from koa_mosfire
-    WHERE maskname NOT LIKE '%%(align)%%'
-    AND UPPER(maskname) NOT LIKE '%%LONG%%'                
-    AND UPPER(maskname) NOT LIKE 'NGC%%'       
-    AND UPPER(maskname) NOT LIKE 'HATP%%'       
-    AND UPPER(maskname) NOT LIKE 'KEPL%%'       
-    AND UPPER(maskname) NOT LIKE 'WASP%%'       
-    AND UPPER(maskname) NOT LIKE 'GJ%%'       
-    AND maskname = 'cr7_mosfire'
+    WHERE maskname = 'ud_van2'
     AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
                 """
     #
@@ -269,7 +262,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         query =  f"""select {', '.join(cols)}
                     from koa_mosfire
                     WHERE gratmode='spectroscopy'
-                    AND (koaimtyp='object' OR koaimtyp='flatlamp')
+                    AND (koaimtyp='object' OR koaimtyp='flatlamp' OR koaimtyp='flatlampoff')
                     AND maskname NOT LIKE '%%(align)%%'
                     {extra_query}
                     order by utdatetime"""
