@@ -2205,6 +2205,9 @@ class MosfireMask(object):
             except IndexError:
                 utils.log_exception(self.logfile, traceback)
                 continue
+            except SystemError:
+                utils.log_exception(self.logfile, traceback)
+                continue
 
             try:
                 hdu = self.drizzle_all_plans(slit_info, 
