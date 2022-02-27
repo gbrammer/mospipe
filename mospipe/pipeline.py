@@ -493,6 +493,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 msg = f'{dir} only found {len(offset_files)} Offset*txt files'
                 utils.log_comment(LOGFILE, msg, verbose=True, 
                                   show_date=True, mode='a')
+                os.chdir(redpath)
                 continue
                 
             os.system(f'{sys.executable} {binpath}/AutoDriver.py')
