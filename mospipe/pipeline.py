@@ -485,10 +485,17 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             utils.log_comment(LOGFILE, msg, verbose=True, 
                               show_date=True, mode='a')
                               
+            offset_files = glob.glob('Offset*txt')
+            if len(offset_files) < 2:
+                msg = f'{dir} only found {len(offset_files)} Offset*txt files'
+                utils.log_comment(LOGFILE, msg, verbose=True, 
+                                  show_date=True, mode='a')
+                continue
+                
             os.system(f'{sys.executable} {binpath}/AutoDriver.py')
 
             longfiles = glob.glob('Long*py')
-
+                
             # Don't run extractions, which are slow
             if os.path.exists('Driver.py'):
 
