@@ -474,7 +474,10 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 all_dirs.append(dirs[0])
             else:
                 continue
-
+        
+        utils.log_comment(LOGFILE, f'all_dirs: {all_dirs}', verbose=True, 
+                          show_date=True, mode='a')
+        
         # Run it on all filters for a given mask
         for dir in all_dirs:
             if not os.path.exists(dir):
@@ -559,12 +562,17 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 os.system(f'{sys.executable} RunFlat.py > mospy.log')
 
             os.chdir(redpath)
-                    
-        update_mask_db_status(datemask, 3, verbose=True)
-        
+                            
         # Extractions
         os.chdir(pwd)
         flat_files = glob.glob(f'{datemask}/*/*/*/*/*combflat_2d*fits')
+        
+        if len(flat_files) > 0:
+            update_mask_db_status(datemask, 3, verbose=True)
+        else:
+            update_mask_db_status(datemask, 9, verbose=True)
+            
+        
         for flat_file in flat_files:
             os.chdir(pwd)
             msk = mospipe.reduce.run_mask(flat_file, skip=skip, 
