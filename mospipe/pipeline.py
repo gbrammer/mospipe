@@ -445,7 +445,15 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         msg = f'\n {redpath}: handle\n'
         utils.log_comment(LOGFILE, msg, verbose=True, 
                           show_date=True, mode='a')
-
+        
+        # Remove "Improper" files
+        raw_files = glob.glob(f'{redpath}/MOSFIRE/*/*/*fits')
+        for file in raw_files:
+            try:
+                _ = IO.readmosfits(file, {})
+            except:
+                os.remove(file)
+        
         os.system(f'{sys.executable} {binpath}/mospy_handle.py '+ 
                   f'{redpath}/MOSFIRE/*/*/*fits > handle.log')
 
@@ -487,7 +495,8 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             msg = f'===========\nProcess mask {dir}\n============'
             utils.log_comment(LOGFILE, msg, verbose=True, 
                               show_date=True, mode='a')
-                              
+            
+            # ToDo: check that offset pairs exist                  
             offset_files = glob.glob('Offset*txt')
             if len(offset_files) < 2:
                 msg = f'{dir} only found {len(offset_files)} Offset*txt files'
