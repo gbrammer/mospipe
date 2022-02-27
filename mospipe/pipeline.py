@@ -449,6 +449,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         
         # Remove "Improper" files
         raw_files = glob.glob(f'{redpath}/MOSFIRE/*/*/*fits')
+        raw_files.sort()
         for file in raw_files:
             try:
                 _ = IO.readmosfits(file, {})

@@ -660,7 +660,8 @@ class MosfireMask(object):
 
     @property 
     def target_names(self):
-        target_names = [t.strip() for t in self.ssl['Target_Name']]
+        target_names = [t.strip().replace('/','-').replace(' ','_') 
+                        for t in self.ssl['Target_Name']]
         return target_names
 
 
