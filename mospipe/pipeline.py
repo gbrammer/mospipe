@@ -4,7 +4,11 @@ import glob
 import time
 
 import numpy as np
+import astropy.time
+
 from grizli import utils
+
+MJDREF = astropy.time.Time('2022-01-01').mjd
 
 def install_dfits():
     """
@@ -42,6 +46,8 @@ def master_query():
     """
     import os
     import pandas as pd
+    import astropy.time
+    
     from grizli.aws import db
     engine = db.get_db_engine()
     
@@ -79,9 +85,26 @@ def master_query():
                 WHERE gratmode='spectroscopy' AND koaimtyp='object'
                 AND maskname NOT LIKE '%%(align)%%'
                 AND maskname NOT LIKE '%%long2pos%%'                
+                AND maskname NOT LIKE '%%LONGSLIT%%'                
                 AND ({egs} OR {cos} OR {uds} OR {gds} OR {gdn})
                 AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
                 GROUP BY maskname, filter, progpi, SUBSTR(koaid, 4, 8)
+                """
+    #
+    query =  f"""select maskname, filter, progpi, progid, SUBSTR(koaid, 4, 8) night, AVG(dra) dra, AVG(ddec) ddec, AVG(ra) ra, AVG(dec) dec, COUNT(maskname) count
+                from koa_mosfire
+                WHERE gratmode='spectroscopy' AND koaimtyp='object'
+                AND maskname NOT LIKE '%%(align)%%'
+                AND UPPER(maskname) NOT LIKE '%%LONG%%'                
+                AND UPPER(maskname) NOT LIKE 'NGC%%'       
+                AND UPPER(maskname) NOT LIKE 'HATP%%'       
+                AND UPPER(maskname) NOT LIKE 'KEPL%%'       
+                AND UPPER(maskname) NOT LIKE 'WASP%%'       
+                AND UPPER(maskname) NOT LIKE 'GJ%%'       
+                AND progpi NOT LIKE '%%ngineer%%'         
+                AND progpi NOT LIKE 'mosfireeng'         
+                AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
+                GROUP BY maskname, filter, progpi, progid, SUBSTR(koaid, 4, 8)
                 """
     
     print(f'======= Query ======= \n{query}\n ===============')
@@ -90,7 +113,15 @@ def master_query():
                    cookiepath=cookiepath)
     
     res = utils.read_catalog(csv_file)
+    res = res[res['count'] >= 8]
+    res = res[res['count'] < 200]
+    
     res['datemask'] = [f'{m}_{d}' for m, d in zip(res['maskname'], res['night'])]
+    
+    from astropy.coordinates import SkyCoord
+    coo = SkyCoord(res['ra'], res['dec'], unit=('deg','deg'))
+    res['gal_lat'] = coo.galactic.b
+    res['gal_lon'] = coo.galactic.l
     
     so = np.argsort(res['night'])[::-1]
     res = res[so]
@@ -99,9 +130,7 @@ def master_query():
     skip = False
     for d in done['datemask']:
         skip |= res['datemask'] == d
-    
-    skip |= res['count'] < 8
-    
+        
     res['status'] = 0
     hyp = np.array(['Hyperi' in d for d in res['datemask']])
     new = np.array([d > 20220000 for d in res['night']])
@@ -124,13 +153,14 @@ def master_query():
     pi |= np.array(['glazebrook' in d.lower() for d in res['progpi']])
     pi |= np.array(['apovich' in d.lower() for d in res['progpi']])
     
-    keep = (~skip) & (hyp | new | highz | pi)
+    keep = (~skip) #& (hyp | new | highz | pi)
     
     un = utils.Unique(res['datemask'][keep], verbose=False)
     df = pd.DataFrame()
     df['datemask'] = un.values
     df['status'] = 0
-        
+    df['updtime'] = astropy.time.Time.now().mjd - MJDREF
+    
     df.to_sql('mosfire_datemask', engine, index=False, 
               if_exists='append', method='multi')
     
@@ -571,6 +601,9 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
     df_obj.to_sql('mosfire_extractions', engine, index=False, 
               if_exists='append', method='multi')
     
+    # Done, remove exposure files
+    # os.system(f'aws s3 rm --recursive s3://mosfire-pipeline/RawFiles/{datemask}/')
+    
     print(f'{datemask}_slit_objects > `mosfire_extractions`')
     
     # 1D spectra
@@ -670,7 +703,7 @@ def slit_summary(datemask, outfile='slit_objects.csv'):
     for file in files:
         
         sp = pyfits.open(file)
-        modtime = modtime = Time(os.path.getmtime(file), format='unix').mjd
+        modtime = Time(os.path.getmtime(file), format='unix').mjd - MJDREF
         row = [file, modtime]
         for k in keys:
             row.append(sp[0].header[k])
@@ -854,7 +887,9 @@ def get_oned_wavelengths(binw=50, filter='K'):
         
         filt = 'K'
         
-        oned = db.from_sql(f"select datemask,ra_targ as ra, dec_targ as dec, target_name,slitnum,exptime,sn50,nline,linew00,linef00,flux,err,lineflux,lineerr from mosfire_spectra_{filt.lower()} natural join mosfire_extractions where filter = '{filt}' AND datemask like '%%ID3%%' ORDER BY sn50 DESC", engine)
+        db.from_sql("select datemask from mosfire_datemask where progpi like '%%ilson%%'", engine)
+        
+        oned = db.from_sql(f"select datemask,ra_targ as ra, dec_targ as dec, target_name,slitnum,exptime,sn50,nline,linew00,linef00,flux,err,lineflux,lineerr from mosfire_spectra_{filt.lower()} natural join mosfire_extractions where datemask = 'Hyperion5_20200311' ORDER BY sn50 DESC", engine)
         print(filt, len(oned))
         logw = get_oned_wavelengths(filter=filt.upper())/1.e4
         
@@ -865,6 +900,13 @@ def get_oned_wavelengths(binw=50, filter='K'):
         fig, ax = plt.subplots(1,1,figsize=(10,3))
         msk = np.array(oned['lineerr'][i]) < 5*np.nanmedian(oned['lineerr'][i]) 
         ax.plot(logw[msk], np.array(oned['flux'][i])[msk]*5, color='pink', alpha=0.8)
+        
+        xb = logw[msk][::4].astype(np.float64)
+        _xb, fb, eb = grizli.utils_c.interp.rebin_weighted_c(xb, 
+                           logw.astype(np.float64), np.array(oned['flux'][i], dtype=np.float64), np.array(oned['err'][i], dtype=np.float64))
+        #
+        ax.step(_xb, fb*5, color='r', alpha=0.8)
+        
         ax.plot(logw[msk], np.array(oned['lineerr'][i])[msk], color='0.8', alpha=0.8)
         ax.plot(logw[msk], np.array(oned['lineflux'][i])[msk], color='k', alpha=0.8)
         
@@ -894,7 +936,7 @@ def update_mask_db_status(datemask, status, verbose=True):
     from grizli.aws import db
     engine = db.get_db_engine()
     
-    NOW = Time.now().mjd
+    NOW = Time.now().mjd - MJDREF
     
     table = 'mosfire_datemask'
     
