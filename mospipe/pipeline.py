@@ -92,6 +92,48 @@ def master_query():
                 GROUP BY maskname, filter, progpi, SUBSTR(koaid, 4, 8)
                 """
     #
+    query =  f"""select maskname, gratmode, koaimtyp, filter, progpi, progid, SUBSTR(koaid, 4, 8) night, ra, dec, object
+    from koa_mosfire
+    WHERE maskname NOT LIKE '%%(align)%%'
+    AND UPPER(maskname) NOT LIKE '%%LONG%%'                
+    AND UPPER(maskname) NOT LIKE 'NGC%%'       
+    AND UPPER(maskname) NOT LIKE 'HATP%%'       
+    AND UPPER(maskname) NOT LIKE 'KEPL%%'       
+    AND UPPER(maskname) NOT LIKE 'WASP%%'       
+    AND UPPER(maskname) NOT LIKE 'GJ%%'       
+    AND maskname = 'cr7_mosfire'
+    AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
+                """
+    #
+    Koa.query_adql(query, csv_file, overwrite=True, format='csv', 
+                   cookiepath=cookiepath)
+    
+    x = utils.read_catalog(csv_file)
+    
+    # Has flat
+    query =  f"""select maskname, filter, progpi, progid, SUBSTR(koaid, 4, 8) night, AVG(dra) dra, AVG(ddec) ddec, AVG(ra) ra, AVG(dec) dec, COUNT(maskname) count
+                from koa_mosfire
+                WHERE maskname NOT LIKE '%%(align)%%'
+                AND UPPER(maskname) NOT LIKE '%%LONG%%'                
+                AND UPPER(maskname) NOT LIKE 'NGC%%'       
+                AND UPPER(maskname) NOT LIKE 'HATP%%'       
+                AND UPPER(maskname) NOT LIKE 'KEPL%%'       
+                AND UPPER(maskname) NOT LIKE 'WASP%%'       
+                AND UPPER(maskname) NOT LIKE 'GJ%%'       
+                AND maskname = 'cr7_mosfire'
+                AND (object LIKE 'Flat:%%')
+                AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
+                GROUP BY maskname, filter, progpi, progid, SUBSTR(koaid, 4, 8)
+                """
+    
+    print(f'======= Query ======= \n{query}\n ===============')
+
+    Koa.query_adql(query, csv_file, overwrite=True, format='csv', 
+                   cookiepath=cookiepath)
+    
+    rflat = utils.read_catalog(csv_file)
+    rflat['datemask'] = [f'{m}_{d}' for m, d in zip(rflat['maskname'], rflat['night'])]
+    
     query =  f"""select maskname, filter, progpi, progid, SUBSTR(koaid, 4, 8) night, AVG(dra) dra, AVG(ddec) ddec, AVG(ra) ra, AVG(dec) dec, COUNT(maskname) count
                 from koa_mosfire
                 WHERE gratmode='spectroscopy' AND koaimtyp='object'
@@ -103,7 +145,8 @@ def master_query():
                 AND UPPER(maskname) NOT LIKE 'WASP%%'       
                 AND UPPER(maskname) NOT LIKE 'GJ%%'       
                 AND progpi NOT LIKE '%%ngineer%%'         
-                AND progpi NOT LIKE 'mosfireeng'         
+                AND progpi NOT LIKE 'mosfireeng'
+                AND ((object NOT LIKE 'Flat:%%' AND object NOT LIKE 'Arc:%%') OR object IS NULL)
                 AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
                 GROUP BY maskname, filter, progpi, progid, SUBSTR(koaid, 4, 8)
                 """
@@ -222,10 +265,11 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                 'progtitl', 'filehand', 'airmass', 'guidfwhm', 'mjd_obs', 
                 "CONCAT(CONCAT(TRIM(maskname), '_'), " + 
                         "SUBSTR(koaid, 4, 8)) as datemask"]
-    
+        
         query =  f"""select {', '.join(cols)}
                     from koa_mosfire
-                    WHERE gratmode='spectroscopy' AND koaimtyp='object'
+                    WHERE gratmode='spectroscopy'
+                    AND (koaimtyp='object' OR koaimtyp='flatlamp')
                     AND maskname NOT LIKE '%%(align)%%'
                     {extra_query}
                     order by utdatetime"""
