@@ -7,6 +7,7 @@ import numpy as np
 import astropy.time
 
 from grizli import utils
+utils.set_warnings()
 
 MJDREF = astropy.time.Time('2022-01-01').mjd
 
