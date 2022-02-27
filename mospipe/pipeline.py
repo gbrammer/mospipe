@@ -221,6 +221,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
     import secrets
     from astropy.table import Table
     import matplotlib.pyplot as plt
+    from MOSFIRE import IO
     
     import mospipe.reduce
     
