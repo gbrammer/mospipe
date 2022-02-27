@@ -448,12 +448,17 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
                           show_date=True, mode='a')
         
         # Remove "Improper" files
+        
         raw_files = glob.glob(f'{redpath}/MOSFIRE/*/*/*fits')
         raw_files.sort()
         for file in raw_files:
             try:
                 _ = IO.readmosfits(file, {})
             except:
+                msg = f'remove invalid file {file}'
+                utils.log_comment(LOGFILE, msg, verbose=True, 
+                                  show_date=True, mode='a')
+                
                 os.remove(file)
         
         os.system(f'{sys.executable} {binpath}/mospy_handle.py '+ 

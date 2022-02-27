@@ -650,13 +650,13 @@ class MosfireMask(object):
         sl = np.cast[float](self.ssl['Slit_length'])
         ssl_stop = np.cumsum(sl/0.1799+5.35)-9
         return np.minimum(ssl_stop, 2045)
-    
+
 
     @property
     def ssl_start(self):
         sl = np.cast[float](self.ssl['Slit_length'])
         return np.maximum(self.ssl_stop - sl/0.1799, 4)
-        
+
 
     @property 
     def target_names(self):
@@ -696,7 +696,7 @@ class MosfireMask(object):
             msg += f'{self.namestr} {self.groups[k].namestr}\n'
 
         for i in range(len(self.ssl)):
-            msg += f"{self.namestr} {i:>4} {self.ssl['Target_Name'][i]} "
+            msg += f"{self.namestr} {i:>4} {self.target_names[i]} "
             ri, di = self.ssl['target_ra'][i], self.ssl['target_dec'][i]
             msg += f"{ri:.6f} {di:.6f} {self.ssl['Magnitude'][i]:.1f}\n"
             
@@ -735,8 +735,10 @@ class MosfireMask(object):
                 ra, dec = self.ssl['slit_ra'][i], self.ssl['slit_dec'][i]
                 cosd = np.cos(dec/180*np.pi)
 
-                dim = np.cast[float]([self.ssl['Slit_width'][i], self.ssl['Slit_length'][i]])/2.
-                dim2 = np.cast[float]([self.ssl['Slit_width'][i], self.ssl['Slit_width'][i]])/2.
+                dim = np.cast[float]([self.ssl['Slit_width'][i], 
+                                      self.ssl['Slit_length'][i]])/2.
+                dim2 = np.cast[float]([self.ssl['Slit_width'][i], 
+                                       self.ssl['Slit_width'][i]])/2.
                 #dim[0] *= 500
                 dy = float(self.ssl['Target_to_center_of_slit_distance'][i])
 
@@ -758,8 +760,8 @@ class MosfireMask(object):
                 row += ','.join([f'{v:.6f}' for v in rot2.flatten()]) + ')'
                 sw = float(self.ssl['Slit_width'][i])/2
                 reg_label = ' # text=<<<{0} {1}>>>\n'
-                row += reg_label.format(self.ssl['Slit_Number'][i].strip(), 
-                                        self.ssl['Target_Name'][i].strip())
+                row += reg_label.format(self.target_slit_numbers[i], 
+                                        self.target_names[i])
                 row = row.replace('<<<','{').replace('>>>','}')
                 fp.write(row)
                 rows.append(row)
@@ -1312,9 +1314,11 @@ class MosfireMask(object):
             if len(xsh) > 1:
                 xok &= (np.abs(np.gradient(xsh)) < 3) & (np.abs(xfit-xsh) < 3)
         
-        targname =  self.ssl['Target_Name'][slit].strip()
-        slit_num = int(self.ssl['Slit_Number'][slit])
-          
+        #targname =  self.ssl['Target_Name'][slit].strip()
+        #slit_num = int(self.ssl['Slit_Number'][slit])
+        targname = self.target_names[slit]
+        slit_num = self.target_slit_numbers[slit]
+         
         slit_info = {}
         slit_info['slit'] = slit
         slit_info['i0'] = i0
