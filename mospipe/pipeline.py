@@ -930,7 +930,7 @@ def setup_db_tables():
     engine.execute('GRANT SELECT ON ALL TABLEs IN SCHEMA public TO redshift_fit_public')
     
     # Test
-    
+
 
 def get_oned_wavelengths(binw=50, filter='K'):
     """
@@ -949,53 +949,8 @@ def get_oned_wavelengths(binw=50, filter='K'):
     logw = logw[clip]
     
     return logw
-    
-    if False:
-        import matplotlib.pyplot as plt
-        from grizli.aws import db
-        engine = db.get_db_engine()
-        
-        filt = 'K'
-        
-        db.from_sql("select datemask from mosfire_datemask where progpi like '%%ilson%%'", engine)
-        
-        oned = db.from_sql(f"select datemask,ra_targ as ra, dec_targ as dec, target_name,slitnum,exptime,sn50,nline,linew00,linef00,flux,err,lineflux,lineerr from mosfire_spectra_{filt.lower()} natural join mosfire_extractions where datemask = 'Hyperion5_20200311' ORDER BY sn50 DESC", engine)
-        print(filt, len(oned))
-        logw = get_oned_wavelengths(filter=filt.upper())/1.e4
-        
-        i = -1
-        
-        i+=1
-        
-        fig, ax = plt.subplots(1,1,figsize=(10,3))
-        msk = np.array(oned['lineerr'][i]) < 5*np.nanmedian(oned['lineerr'][i]) 
-        ax.plot(logw[msk], np.array(oned['flux'][i])[msk]*5, color='pink', alpha=0.8)
-        
-        xb = logw[msk][::4].astype(np.float64)
-        _xb, fb, eb = grizli.utils_c.interp.rebin_weighted_c(xb, 
-                           logw.astype(np.float64), np.array(oned['flux'][i], dtype=np.float64), np.array(oned['err'][i], dtype=np.float64))
-        #
-        ax.step(_xb, fb*5, color='r', alpha=0.8)
-        
-        ax.plot(logw[msk], np.array(oned['lineerr'][i])[msk], color='0.8', alpha=0.8)
-        ax.plot(logw[msk], np.array(oned['lineflux'][i])[msk], color='k', alpha=0.8)
-        
-        ymax = np.maximum(oned['linef00'][i], 5*np.nanmedian(oned['lineerr'][i]))
-        ax.set_ylim(-0.5*ymax, 1.5*ymax)
-        
-        ax.vlines(oned['linew00'][i]/1.e4, *ax.get_ylim(), color='r', linestyle=':')
-        ax.hlines(0, *ax.get_xlim(), color='orange', linestyle='--')
-        
-        
-        ax.set_xlim(logw[0], logw[-1])
-        ax.grid()
-        ax.set_xlabel(f'$\lambda$ [$\mu$m]')
-        ax.text(0.05, -0.1, f"{oned['datemask'][i]}", ha='left', va='top', transform=ax.transAxes, fontsize=8)
-        ax.text(0.95, -0.1, f"{oned['slitnum'][i]} - {oned['target_name'][i]}", ha='right', va='top', transform=ax.transAxes, fontsize=8)
 
-        fig.tight_layout(pad=0.2)
-        
-        
+
 def update_mask_db_status(datemask, status, verbose=True):
     """
     Set status flag of a mask in the `mosfire_datemask` table
