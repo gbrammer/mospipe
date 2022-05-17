@@ -627,7 +627,10 @@ class MosfireMask(object):
                 self.ssl['target_ra'][i] = target_rd.ra.value
                 self.ssl['target_dec'][i] = target_rd.dec.value
                 if 'Magnitude' in tsl.colnames:
-                    self.ssl['Magnitude'][i] = float(tsl['Magnitude'][ti])
+                    try:
+                        self.ssl['Magnitude'][i] = float(tsl['Magnitude'][ti])
+                    except ValueError:
+                        self.ssl['Magnitude'][i] = 99.
                     
         # Coords
         ras = []
