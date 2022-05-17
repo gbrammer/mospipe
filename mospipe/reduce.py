@@ -195,7 +195,7 @@ def fit_wavelength_from_sky(sky_row, band, order=3, make_figure=True, nsplit=5, 
         for il, l in enumerate(lines[band]):
             yline += line_intens[band][il]*np.exp(-(wave-l)**2/2/dlam**2)
 
-        shift, error, diffphase = phase_cross_correlation(sky_row[None,:], yline[None,:], upsample_factor=100, reference_mask=~np.isnan(sky_row[None,:]), moving_mask=~np.isnan(yline[None,:]))
+        shift, error, diffphase = phase_cross_correlation(sky_row[None,:], yline[None,:], upsample_factor=100, reference_mask=~np.isnan(sky_row[None,:]), moving_mask=~np.isnan(yline[None,:]), return_error=True)
         msg = f'  phase shift {it} {shift[1]:.2f}  x0={x0-shift[1]*dlam:.3f}'
         utils.log_comment(utils.LOGFILE, msg, verbose=True)
         
@@ -1299,7 +1299,8 @@ class MosfireMask(object):
             cc = phase_cross_correlation(row, sky_row[None,:],
                                          upsample_factor=100, 
                                 reference_mask=~np.isnan(row), 
-                                moving_mask=~np.isnan(sky_row[None,:]))
+                                moving_mask=~np.isnan(sky_row[None,:]), 
+                                return_error=True)
             (_, xsh[i]), error, diffphase = cc
         
         if (i1-i0 > 200):
