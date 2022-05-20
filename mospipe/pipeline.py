@@ -787,7 +787,7 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
     
     os.system(f'cd {owd}/{datemask}; '+ 
               f'aws s3 sync ./ s3://{bucket}/{prefix}/{datemask}/ ' + 
-              '--exclude "*" --include "Reduced/*/*/[YJHK]/*" {pub_str}')
+              f'--exclude "*" --include "Reduced/*/*/[YJHK]/*" {pub_str}')
     
     files = glob.glob(f'{datemask}*.*g')
     files.sort()
