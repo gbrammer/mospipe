@@ -150,8 +150,33 @@ def master_query():
                    cookiepath=cookiepath)
     
     res = utils.read_catalog(csv_file)
+    
     res = res[res['count'] >= 8]
     res = res[res['count'] < 200]
+    
+    ############### Full query
+    query =  f"""SELECT instrume, targname, koaimtyp, pattern, date_obs, mgtname, maskname, semid, proginst, progid, progpi, progtitl, SUBSTR(koaid, 4, 8) night
+                from koa_mosfire
+                WHERE gratmode='spectroscopy' AND koaimtyp='object'
+                AND maskname NOT LIKE '%%(align)%%'
+                AND UPPER(maskname) NOT LIKE '%%LONG%%'                
+                AND UPPER(maskname) NOT LIKE 'NGC%%'       
+                AND UPPER(maskname) NOT LIKE 'HATP%%'       
+                AND UPPER(maskname) NOT LIKE 'KEPL%%'       
+                AND UPPER(maskname) NOT LIKE 'WASP%%'       
+                AND UPPER(maskname) NOT LIKE 'GJ%%'       
+                AND progpi NOT LIKE '%%ngineer%%'         
+                AND progpi NOT LIKE 'mosfireeng'
+                AND ((object NOT LIKE 'Flat:%%' AND object NOT LIKE 'Arc:%%') OR object IS NULL)
+                AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
+                """
+    
+    #query += "AND date_obs > '2020-08-01'"
+    
+    Koa.query_adql(query, csv_file, overwrite=True, format='csv', 
+                   cookiepath=cookiepath)
+    
+    res = utils.read_catalog(csv_file)
     
     res['datemask'] = [f'{m}_{d}' for m, d in zip(res['maskname'], res['night'])]
     
@@ -164,11 +189,13 @@ def master_query():
     res = res[so]
     
     done = db.from_sql('select datemask, progid from mosfire_datemask', engine)
-    skip = False
-    for d in done['datemask']:
-        skip |= res['datemask'] == d
+    #skip = False
+    #for d in done['datemask']:
+    #    skip |= res['datemask'] == d
+    skip = np.in1d(res['datemask'], done['datemask'])
         
     res['status'] = 0
+    
     hyp = np.array(['Hyperi' in d for d in res['datemask']])
     new = np.array([d > 20220000 for d in res['night']])
     highz = np.array(['z8' in d.lower() for d in res['datemask']])
@@ -212,6 +239,53 @@ def master_query():
 
     run_one(datemask='C2020_maskID1_20220114', delete_from_s3=False, orig_slit_numbers=[3], save_full_drizzled=True, clean=False, skip=False)
     
+    #
+    ############### Full query
+    query =  f"""SELECT instrume, targname, koaimtyp, pattern, date_obs, mgtname, maskname, semid, proginst, progid, progpi, progtitl, SUBSTR(koaid, 4, 8) night
+                from koa_mosfire
+                WHERE gratmode='spectroscopy' AND koaimtyp='object'
+                AND maskname NOT LIKE '%%(align)%%'
+                AND UPPER(maskname) NOT LIKE '%%LONG%%'                
+                AND UPPER(maskname) NOT LIKE 'NGC%%'       
+                AND UPPER(maskname) NOT LIKE 'HATP%%'       
+                AND UPPER(maskname) NOT LIKE 'KEPL%%'       
+                AND UPPER(maskname) NOT LIKE 'WASP%%'       
+                AND UPPER(maskname) NOT LIKE 'GJ%%'       
+                AND progpi NOT LIKE '%%ngineer%%'         
+                AND progpi NOT LIKE 'mosfireeng'
+                AND ((object NOT LIKE 'Flat:%%' AND object NOT LIKE 'Arc:%%') OR object IS NULL)
+                AND (filter = 'Y' OR filter = 'J' OR filter = 'H' OR filter = 'K')
+                """
+    #
+    Koa.query_adql(query, csv_file, overwrite=True, format='csv', 
+                   cookiepath=cookiepath)
+    
+    res = utils.read_catalog(csv_file)
+    
+    res['datemask'] = [f'{m}_{d}' for m, d in zip(res['maskname'], res['night'])]
+    
+    un = utils.Unique(res['datemask'], verbose=False)
+    ix = []
+    res['count'] = 0
+    
+    for i, v in enumerate(un.values):
+        res['count'][un[v]] = un.counts[i]
+        if un.counts[i] < 200:
+            ix.append(np.where(un[v])[0][0])
+    
+    res = res[ix]
+    res.rename_column('instrume','instrument')
+    res.remove_column('night')
+    
+    so = np.argsort(res['date_obs'])
+    res = res[so]
+    
+    done = db.SQL('select datemask, progid, status from mosfire_datemask')
+    skip = np.in1d(res['datemask'], done['datemask'])
+    
+    abell = np.array(['2744' in t for t in res['targname']])
+    
+    aold = np.array(['2744' in t for t in done['datemask']])
     
     
 def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and maskname='gs'", csv_file='mosfire.{hash}.csv', pwd='/GrizliImaging/', skip=True, min_nexp=10, sync=True, query_only=False, download_only=False, skip_long2pos=True, **kwargs):
@@ -374,13 +448,21 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
         fitsfiles = glob.glob(os.path.join(rawdir, '*fits'))
         wget = 'wget https://koa.ipac.caltech.edu/cgi-bin/getKOA/nph-getKOA?filehand={0} -O {1}'
         if len(fitsfiles) > 0:
-            Koa.download(mask_table, 'ipac', rawdir, calibfile=0)   
+            if cookiepath:
+                Koa.login(cookiepath, userid=os.environ['KOA_USERNAME'],
+                          password=os.environ['KOA_PASSWORD'], 
+                          debugfile='koa.debug')
+
+            Koa.download(mask_table, 'ipac', rawdir, calibfile=0, 
+                         cookiepath=cookiepath)  
+                          
             # Still missing?
             for f in tmp['filehand']:
                 if not os.path.exists(os.path.join(rawdir, 
                                       os.path.basename(f))):
                     print('File still missing, try one more time')
-                    Koa.download(mask_table, 'ipac', rawdir, calibfile=0)   
+                    Koa.download(mask_table, 'ipac', rawdir, calibfile=0, 
+                                 cookiepath=cookiepath)   
         else:
             if cookiepath:
                 Koa.login(cookiepath, userid=os.environ['KOA_USERNAME'],
@@ -604,7 +686,7 @@ def run_pipeline(extra_query="AND progpi like '%%obash%%' AND progid='U190' and 
             sync_results(datemask, **kwargs)
 
 
-def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_s3=False, **kwargs):
+def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_from_s3=False, make_public=True, **kwargs):
     """
     Send files to S3 and update database
     """
@@ -700,15 +782,17 @@ def sync_results(datemask, bucket='mosfire-pipeline', prefix='Spectra', delete_f
     
     if delete_from_s3:
         os.system(f'aws s3 rm s3://{bucket}/{prefix}/{datemask}/ --recursive')
-        
+    
+    pub_str = ' --acl public-read ' if make_public else ''
+    
     os.system(f'cd {owd}/{datemask}; '+ 
               f'aws s3 sync ./ s3://{bucket}/{prefix}/{datemask}/ ' + 
-              '--exclude "*" --include "Reduced/*/*/[YJHK]/*"')
+              '--exclude "*" --include "Reduced/*/*/[YJHK]/*" {pub_str}')
     
     files = glob.glob(f'{datemask}*.*g')
     files.sort()
     for file in files:
-        os.system(f'aws s3 cp {file} s3://{bucket}/Log/')
+        os.system(f'aws s3 cp {file} s3://{bucket}/Log/ {pub_str}')
             
     os.chdir(owd)
     return True
